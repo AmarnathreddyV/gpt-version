@@ -24,7 +24,7 @@ export const Header: React.FC<HeaderProps> = ({ currentRoute, navigate, hasActiv
           aria-label="S.19 SKINLABS Home"
         >
           <div className="flex items-baseline gap-1">
-            <span className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-[#171715] group-hover:opacity-80 transition-opacity">
+            <span className="text-2xl sm:text-3xl font-medium tracking-[-0.03em] text-[#171715] group-hover:opacity-80 transition-opacity">
               S:19
             </span>
           </div>

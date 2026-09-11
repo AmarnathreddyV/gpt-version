@@ -14,7 +14,7 @@ export const Footer: React.FC<FooterProps> = ({ navigate }) => {
           {/* Brand Left */}
           <div className="md:col-span-6 space-y-3">
             <div className="flex items-baseline gap-1">
-              <span className="font-serif text-2xl font-normal tracking-tight text-[#171715]">
+              <span className="text-2xl font-medium tracking-[-0.03em] text-[#171715]">
                 S:19
               </span>
             </div>

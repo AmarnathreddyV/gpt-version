@@ -18,12 +18,12 @@ export const Hero: React.FC<HeroProps> = ({ onStart, onOpenChat }) => {
           <div className="lg:col-span-7 space-y-8">
             
             <div className="space-y-3">
-              <span className="text-[11px] sm:text-xs uppercase tracking-[0.25em] text-[#6D6A63] font-medium block">
-                S.19 SKINLABS &bull; CLINICAL INTENTION
+              <span className="text-[11px] sm:text-xs uppercase tracking-[0.2em] text-[#6D6A63] font-medium block">
+                THE STORY OF S19
               </span>
-              <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-normal tracking-tight text-[#171715] leading-[1.08]">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-normal tracking-[-0.035em] text-[#171715] leading-[1.08]">
                 Skincare, with <br />
-                <span className="italic">intention.</span>
+                <span>intention.</span>
               </h1>
             </div>
 
@@ -34,7 +34,7 @@ export const Hero: React.FC<HeroProps> = ({ onStart, onOpenChat }) => {
                 <div className="w-4 h-8 bg-[#F4F0E8] rounded-r-full -ml-4" />
               </div>
               <div className="space-y-1">
-                <p className="text-base sm:text-lg font-serif text-[#171715]">
+                <p className="text-base sm:text-lg font-normal tracking-[-0.02em] text-[#171715]">
                   Your skin is allowed to change.
                 </p>
                 <p className="text-sm sm:text-base text-[#6D6A63] leading-relaxed">
@@ -116,10 +116,10 @@ export const Hero: React.FC<HeroProps> = ({ onStart, onOpenChat }) => {
       <section className="max-w-7xl mx-auto px-6 sm:px-8 lg:px-12 py-16 sm:py-20">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-16 items-start">
           <div className="md:col-span-5 space-y-3">
-            <span className="text-[11px] uppercase tracking-[0.25em] text-[#6D6A63] font-medium block">
+            <span className="text-[11px] uppercase tracking-[0.2em] text-[#6D6A63] font-medium block">
               THE PHILOSOPHY OF PHASES
             </span>
-            <h2 className="font-serif text-2xl sm:text-3xl text-[#171715] leading-snug">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-normal text-[#171715] leading-snug tracking-[-0.03em]">
               Skin is not a static type. It is an evolving state.
             </h2>
           </div>

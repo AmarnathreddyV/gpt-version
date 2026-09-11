@@ -181,12 +181,12 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
       {/* Editorial Header (Mandated exact text: "A little more intention.") */}
       <div className="space-y-4 mb-8">
-        <span className="text-[11px] uppercase tracking-[0.25em] text-[#6D6A63] font-medium block">
+        <span className="text-[11px] uppercase tracking-[0.2em] text-[#6D6A63] font-medium block">
           CONVERSATION &bull; S.19 CLINICAL INTELLIGENCE
         </span>
-        <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-tight leading-tight">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-[-0.035em] leading-tight">
           A little more <br className="hidden sm:inline" />
-          <span className="italic">intention.</span>
+          <span>intention.</span>
         </h1>
       </div>
 
@@ -197,7 +197,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
             <span className="text-[10px] uppercase tracking-[0.2em] font-medium text-[#C86D51] block">
               YOUR S.19 PHASE
             </span>
-            <div className="font-serif text-base sm:text-lg text-[#171715]">
+            <div className="text-base sm:text-lg font-medium tracking-[-0.02em] text-[#171715]">
               {phaseContext.title}
             </div>
           </div>
@@ -206,7 +206,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
             <span className="text-[10px] uppercase tracking-[0.2em] font-medium text-[#6D6A63] block">
               RECOMMENDED PRODUCT
             </span>
-            <div className="font-serif text-base sm:text-lg text-[#171715] truncate">
+            <div className="text-base sm:text-lg font-medium tracking-[-0.02em] text-[#171715] truncate">
               {phaseContext.product}
             </div>
           </div>
@@ -262,7 +262,7 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
               </div>
               <div className="p-4 bg-[#F4F0E8] border border-[#C9C3B8] text-sm text-[#6D6A63] flex items-center gap-2">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#C86D51] animate-pulse" />
-                <span className="font-serif italic text-xs tracking-wide">Thinking...</span>
+                <span className="text-xs tracking-wider text-[#6D6A63]">Thinking...</span>
               </div>
             </div>
           )}

@@ -27,10 +27,10 @@ export const VisualPhasePicker: React.FC<VisualPhasePickerProps> = ({
 
       {/* Editorial Header */}
       <div className="max-w-3xl space-y-3 mb-12 sm:mb-16">
-        <span className="text-[11px] uppercase tracking-[0.25em] text-[#6D6A63] font-medium block">
+        <span className="text-[11px] uppercase tracking-[0.2em] text-[#6D6A63] font-medium block">
           PATH B &bull; VISUAL IDENTIFICATION
         </span>
-        <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-tight leading-tight">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-[-0.035em] leading-tight">
           Select your current skin phase.
         </h1>
         <p className="text-base sm:text-lg text-[#6D6A63] leading-relaxed">
@@ -54,7 +54,7 @@ export const VisualPhasePicker: React.FC<VisualPhasePickerProps> = ({
                 className="w-full h-full object-cover grayscale-[10%] group-hover:scale-[1.03] transition-transform duration-700 ease-out"
                 referrerPolicy="no-referrer"
               />
-              <div className="absolute top-4 left-4 bg-[#171715]/85 text-[#F4F0E8] text-[10px] uppercase tracking-[0.25em] px-2.5 py-1 backdrop-blur-xs">
+              <div className="absolute top-4 left-4 bg-[#171715]/85 text-[#F4F0E8] text-[10px] uppercase tracking-[0.2em] px-2.5 py-1 backdrop-blur-xs">
                 PHASE 0{phase.phaseNumber}
               </div>
             </div>
@@ -62,7 +62,7 @@ export const VisualPhasePicker: React.FC<VisualPhasePickerProps> = ({
             {/* Content Area */}
             <div className="p-6 sm:p-8 space-y-4 flex-1 flex flex-col justify-between">
               <div className="space-y-2">
-                <h3 className="font-serif text-xl sm:text-2xl text-[#171715] tracking-tight">
+                <h3 className="text-xl sm:text-2xl font-medium text-[#171715] tracking-[-0.03em]">
                   {phase.title}
                 </h3>
                 <p className="text-sm text-[#6D6A63] leading-relaxed">

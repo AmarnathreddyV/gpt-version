@@ -27,10 +27,10 @@ export const PhaseSelector: React.FC<PhaseSelectorProps> = ({
 
       {/* Editorial Header */}
       <div className="max-w-3xl space-y-4 mb-14 sm:mb-20">
-        <span className="text-[11px] uppercase tracking-[0.25em] text-[#6D6A63] font-medium block">
+        <span className="text-[11px] uppercase tracking-[0.2em] text-[#6D6A63] font-medium block">
           STEP 01 &bull; PHASE SELECTION
         </span>
-        <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-tight leading-tight">
+        <h1 className="text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-[-0.035em] leading-tight">
           Find your skin phase.
         </h1>
         <p className="text-base sm:text-lg text-[#6D6A63] leading-relaxed">
@@ -57,7 +57,7 @@ export const PhaseSelector: React.FC<PhaseSelectorProps> = ({
             </div>
 
             <div className="space-y-3 pt-2">
-              <h2 className="font-serif text-2xl sm:text-3xl text-[#171715] leading-snug">
+              <h2 className="text-2xl sm:text-3xl font-medium text-[#171715] leading-snug tracking-[-0.03em]">
                 I DON'T KNOW MY SKIN PHASE
               </h2>
               <p className="text-sm sm:text-base text-[#6D6A63] leading-relaxed">
@@ -108,7 +108,7 @@ export const PhaseSelector: React.FC<PhaseSelectorProps> = ({
             </div>
 
             <div className="space-y-3 pt-2">
-              <h2 className="font-serif text-2xl sm:text-3xl text-[#171715] leading-snug">
+              <h2 className="text-2xl sm:text-3xl font-medium text-[#171715] leading-snug tracking-[-0.03em]">
                 I KNOW MY SKIN PHASE
               </h2>
               <p className="text-sm sm:text-base text-[#6D6A63] leading-relaxed">

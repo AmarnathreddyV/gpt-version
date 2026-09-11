@@ -74,13 +74,13 @@ export const ResultPage: React.FC<ResultPageProps> = ({
           
           {/* Phase Title & Summary */}
           <div className="space-y-3 pb-8 border-b border-[#C9C3B8]">
-            <span className="text-xs uppercase tracking-[0.25em] text-[#C86D51] font-medium block">
+            <span className="text-xs uppercase tracking-[0.2em] text-[#C86D51] font-medium block">
               YOUR S.19 PHASE
             </span>
-            <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-tight leading-tight">
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-normal text-[#171715] tracking-[-0.035em] leading-tight">
               {phase.title}
             </h1>
-            <p className="text-base sm:text-lg text-[#171715]/80 font-serif pt-2 leading-relaxed">
+            <p className="text-base sm:text-lg text-[#171715]/80 font-normal pt-2 leading-relaxed tracking-[-0.015em]">
               {phase.summary}
             </p>
             <p className="text-sm text-[#6D6A63] leading-relaxed">
@@ -90,14 +90,14 @@ export const ResultPage: React.FC<ResultPageProps> = ({
 
           {/* S.19 Recommendation */}
           <div className="space-y-4">
-            <span className="text-xs uppercase tracking-[0.25em] text-[#6D6A63] font-medium block">
+            <span className="text-xs uppercase tracking-[0.2em] text-[#6D6A63] font-medium block">
               YOUR S.19 RECOMMENDATION
             </span>
             
             <div className="p-6 bg-[#FAF8F4] border border-[#C9C3B8] space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="font-serif text-2xl sm:text-3xl text-[#171715] tracking-tight uppercase">
+                  <h2 className="text-2xl sm:text-3xl font-medium text-[#171715] tracking-[-0.03em] uppercase">
                     {phase.recommendedProduct}
                   </h2>
                   <span className="text-xs text-[#6D6A63] uppercase tracking-wider block mt-1">
@@ -151,7 +151,7 @@ export const ResultPage: React.FC<ResultPageProps> = ({
                     key={idx}
                     className="p-4 border border-[#C9C3B8] bg-[#FAF8F4] space-y-1"
                   >
-                    <div className="font-serif text-xl sm:text-2xl text-[#171715]">
+                    <div className="text-xl sm:text-2xl font-medium tracking-tight text-[#171715]">
                       {active.percentage}
                     </div>
                     <div className="text-xs font-medium text-[#171715] leading-snug">

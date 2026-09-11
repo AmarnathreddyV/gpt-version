@@ -139,14 +139,14 @@ export const Assessment: React.FC<AssessmentProps> = ({ onComplete, onCancel }) 
         
         {/* Step indicator: e.g. 01 / 08 */}
         <div>
-          <span className="text-sm sm:text-base font-serif tracking-widest text-[#C86D51] font-medium block">
+          <span className="text-xs sm:text-sm tracking-[0.2em] text-[#C86D51] font-medium block">
             {currentQuestion.numberStr}
           </span>
         </div>
 
         {/* Question Text */}
         <div className="space-y-3 max-w-2xl">
-          <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl font-normal text-[#171715] leading-[1.25] tracking-tight">
+          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-normal text-[#171715] leading-[1.25] tracking-[-0.035em]">
             {currentQuestion.question}
           </h2>
           {currentQuestion.subtitle && (
