@@ -1,0 +1,6 @@
+{
+  "name": "S.19 SKINLABS - Find Your Skin Phase",
+  "description": "Editorial skincare diagnostic and intelligent care recommendation website by S.19 SKINLABS.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
