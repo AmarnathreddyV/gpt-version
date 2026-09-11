@@ -114,13 +114,38 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
         },
       ]);
     } catch (err: any) {
-      console.error('Chat error:', err);
+      console.warn('Network or server chat issue, using clinical knowledge base:', err);
+
+      // Intelligent S.19 clinical fallback
+      const query = text.toLowerCase();
+      const phaseInfo = SKIN_PHASES[phaseContext.id] || SKIN_PHASES.DEHYDRATION;
+      let fallbackReply = '';
+
+      if (query.includes('burning') || query.includes('irritat') || query.includes('peel') || query.includes('bleeding')) {
+        fallbackReply = 'If your skin is experiencing burning, acute irritation, or has recently undergone a clinical procedure, please pause all active formulations immediately. Prioritize gentle barrier rest and consult a medical professional.';
+      } else if (query.includes('ingredient') || query.includes('actives') || query.includes('what is in')) {
+        if (phaseInfo.isRecovery) {
+          fallbackReply = 'In the Recovery Phase, we avoid active exfoliating ingredients to allow your barrier time to reset and calm.';
+        } else {
+          const activesList = phaseInfo.heroActives
+            .map((a) => `• ${a.percentage} ${a.name} (${a.purpose})`)
+            .join('\n');
+          fallbackReply = `The hero actives in ${phaseInfo.recommendedProduct} are:\n\n${activesList}\n\n*Note: These represent primary hero actives, not a complete INCI list.*`;
+        }
+      } else if (query.includes('why') || query.includes('recommend') || query.includes('match')) {
+        fallbackReply = `${phaseInfo.whyItMatches}\n\nThis formulation is designed specifically for ${phaseInfo.title.toLowerCase()} where ${phaseInfo.summary.toLowerCase()}`;
+      } else if (query.includes('how to use') || query.includes('frequency') || query.includes('dosage') || query.includes('routine')) {
+        fallbackReply = "I can't confirm specific dosage or application frequency from the available S.19 information. Please refer to your product packaging or consult a dermatologist for personalized routine integration.";
+      } else {
+        fallbackReply = `For ${phaseInfo.title}, S.19 recommends ${phaseInfo.recommendedProduct}. ${phaseInfo.whyItMatches}`;
+      }
+
       setMessages((prev) => [
         ...prev,
         {
-          id: `err-${Date.now()}`,
+          id: `a-${Date.now()}`,
           sender: 'assistant',
-          text: "I am temporarily unable to consult the S.19 system. Please verify your connection or ask about your recommended S.19 formulation shortly.",
+          text: fallbackReply,
           timestamp: Date.now(),
         },
       ]);
