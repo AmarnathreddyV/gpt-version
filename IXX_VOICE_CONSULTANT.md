@@ -1,22 +1,40 @@
-# IXX Voice Consultant
+# IXX Voice Consultant — Gemini Live
 
-The S.19 homepage now opens with **IXX**, a friendly voice skincare consultant.
+IXX is the S.19 homepage voice skincare consultant powered by Gemini Live.
 
-## Experience
+## Voice experience
 
-1. IXX appears automatically on the homepage.
-2. The browser immediately attempts to speak the welcome message.
-3. IXX asks what the customer wants to improve.
-4. The customer can answer by microphone or text.
-5. The answer is sent to the existing `/api/chat` S.19 AI endpoint.
-6. IXX asks one useful follow-up when needed.
-7. Once enough information is available, IXX recommends the relevant S.19 phase/product and explains why.
-8. English, Hindi and Telugu modes are available.
+- IXX opens automatically on the homepage.
+- Gemini Live provides real-time bidirectional audio instead of browser speech recognition + OpenAI TTS.
+- The microphone streams 16 kHz PCM audio directly to Gemini Live.
+- Gemini Live returns native 24 kHz PCM audio for immediate playback.
+- Server-side VAD allows natural turn-taking and interruption.
+- If the customer talks while IXX is speaking, Gemini Live can interrupt the current response.
+- Input/output transcriptions are used only for the visible conversation text.
+- The assistant automatically follows English, Hindi, Telugu, or natural mixed speech.
+- Telugu/Hindi responses are instructed to keep the local language dominant with only natural English skincare terms.
+- IXX is always displayed as **IXX**. In speech it is instructed to sound like one syllable, “icks” — Vicks without the V.
 
-## Important browser behavior
+## Gemini API setup
 
-Modern browsers can block unsolicited audio autoplay. The implementation attempts to speak immediately, but if the browser blocks it, the customer can press **Talk to IXX** or the speaker button once to unlock audio. This is a browser security restriction, not an application failure.
+Add this Vercel environment variable:
 
-## Deployment
+`GEMINI_API_KEY=your_gemini_api_key`
 
-Keep the existing `OPENAI_API_KEY` server-side environment variable configured in Vercel. The IXX consultant uses the existing `/api/chat` endpoint, so it does not expose the API key in the browser.
+The browser does **not** receive the long-lived Gemini API key. `/api/gemini-live-token` creates a short-lived Gemini Live ephemeral token and the browser uses that token for its WebSocket connection.
+
+The current implementation uses `gemini-3.8-live` and the prebuilt `Leda` voice.
+
+## Free tier
+
+Gemini 3.8 Live currently has a Free Tier according to Google's Gemini API pricing page. The actual usable rate limits are project/model specific and can be checked in Google AI Studio. Keep the assistant's replies short and avoid unnecessary parallel sessions to reduce usage.
+
+## Removed from the voice path
+
+The homepage IXX voice path no longer depends on:
+
+- `/api/transcribe` for speech recognition
+- `/api/tts` for speech generation
+- `OPENAI_API_KEY` for IXX voice
+
+Those files can remain in the project for other functionality, but they are not used by the Gemini Live IXX component.
