@@ -9,8 +9,8 @@ type Language = 'en' | 'hi' | 'te';
 
 const GREETINGS: Record<Language, string> = {
   en: "Hi, I'm IXX, your S.19 skin consultant. I'm here to understand what your skin needs right now and guide you to the S.19 care that fits. Tell me, what would you like to improve about your skin?",
-  hi: "Hi, main IXX hoon, aapka S.19 skin consultant. Main pehle samajhna chahti hoon ki abhi aapki skin ko kya chahiye, phir aapko suitable S.19 care suggest karungi. Aap apni skin mein kya improve karna chahte hain?",
-  te: "Hi, nenu IXX, mee S.19 skin consultant. Munduga mee skin ippudu em kavalo ardham chesukoni, daniki suitable S.19 care ni suggest chestanu. Mee skin lo meeru em improve cheyyalanukuntunnaru?",
+  hi: "नमस्ते, मैं IXX हूँ, आपकी S.19 स्किन कंसल्टेंट। पहले मैं समझना चाहती हूँ कि अभी आपकी स्किन को क्या चाहिए, फिर मैं आपके लिए सही S.19 केयर सुझाऊँगी। आप अपनी स्किन में क्या सुधार करना चाहते हैं?",
+  te: "హాయ్, నేను IXX, మీ S.19 స్కిన్ కన్సల్టెంట్‌ని. ముందుగా మీ స్కిన్‌కి ఇప్పుడు ఏం అవసరమో అర్థం చేసుకుని, మీకు సరిపోయే S.19 కేర్‌ని సూచిస్తాను. మీ స్కిన్‌లో మీరు ఏం మెరుగుపరుచుకోవాలనుకుంటున్నారు?",
 };
 
 const PLACEHOLDER: Record<Language, string> = {
@@ -27,14 +27,6 @@ const getSpeechRecognition = () => {
   return w.SpeechRecognition || w.webkitSpeechRecognition || null;
 };
 
-function chooseVoice(lang: Language) {
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
-  const prefix = lang === 'te' ? 'te' : lang === 'hi' ? 'hi' : 'en';
-  return window.speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith(prefix))
-    || window.speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith('en'))
-    || null;
-}
-
 export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) => {
   const [open, setOpen] = useState(true);
   const [language, setLanguage] = useState<Language>('en');
@@ -46,19 +38,59 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   const recognitionRef = useRef<any>(null);
   const hasWelcomed = useRef(false);
 
-  const speak = (value: string, lang: Language = language) => {
-    if (!value || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(value);
-    utterance.lang = lang === 'te' ? 'te-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
-    const voice = chooseVoice(lang);
-    if (voice) utterance.voice = voice;
-    utterance.rate = 0.96;
-    utterance.pitch = 1.02;
-    utterance.onstart = () => setSpeaking(true);
-    utterance.onend = () => setSpeaking(false);
-    utterance.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const speak = async (value: string, lang: Language = language) => {
+    if (!value || typeof window === 'undefined') return;
+
+    // Use OpenAI neural TTS instead of Chrome speechSynthesis. This gives IXX
+    // a consistent female voice and much better multilingual pronunciation.
+    try {
+      audioRef.current?.pause();
+      if (audioRef.current) audioRef.current.currentTime = 0;
+
+      setSpeaking(true);
+      const speechText = lang === 'te'
+        ? value.replace(/S\.19/gi, 'ఎస్ నైన్టీన్')
+        : lang === 'hi'
+          ? value.replace(/S\.19/gi, 'एस नाइन्टीन')
+          : value.replace(/S\.19/gi, 'S nineteen');
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: speechText, language: lang }),
+      });
+
+      if (!response.ok) throw new Error('TTS request failed');
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => {
+        setSpeaking(false);
+        URL.revokeObjectURL(url);
+      };
+      audio.onerror = () => {
+        setSpeaking(false);
+        URL.revokeObjectURL(url);
+      };
+      await audio.play();
+    } catch {
+      // Fallback only if the neural TTS endpoint is unavailable.
+      setSpeaking(false);
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(value);
+        utterance.lang = lang === 'te' ? 'te-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
+        utterance.rate = 0.94;
+        utterance.pitch = 1.08;
+        utterance.onstart = () => setSpeaking(true);
+        utterance.onend = () => setSpeaking(false);
+        utterance.onerror = () => setSpeaking(false);
+        window.speechSynthesis.speak(utterance);
+      }
+    }
   };
 
   const unlockAndWelcome = () => {
@@ -77,17 +109,17 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      window.speechSynthesis.onvoiceschanged = () => { chooseVoice(language); };
-    }
     return () => {
       window.speechSynthesis?.cancel();
+      audioRef.current?.pause();
       recognitionRef.current?.stop?.();
     };
-  }, [language]);
+  }, []);
 
   const stopSpeaking = () => {
     window.speechSynthesis?.cancel();
+    audioRef.current?.pause();
+    if (audioRef.current) audioRef.current.currentTime = 0;
     setSpeaking(false);
   };
 
@@ -100,7 +132,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
 
     try {
       const history = conversation.map((item, i) => ({ sender: i % 2 === 0 ? 'user' : 'assistant', text: item }));
-      const prompt = `You are IXX, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. Keep the response suitable for spoken audio, under 70 words.`;
+      const prompt = `You are IXX, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. For Telugu, use Telugu script (తెలుగు) rather than Roman Telugu. For Hindi, use Devanagari rather than Roman Hindi. Keep the response suitable for spoken audio, under 70 words.`;
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,9 +144,9 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
       speak(reply, language);
     } catch (error) {
       const fallback = language === 'te'
-        ? 'Parvaledu. Mee skin gurinchi konchem inka cheppandi, nenu S.19 care ni guide chestanu.'
+        ? 'పర్లేదు. మీ స్కిన్ గురించి కొంచెం ఇంకా చెప్పండి, నేను S.19 కేర్‌లో మీకు గైడ్ చేస్తాను.'
         : language === 'hi'
-          ? 'Koi baat nahi. Apni skin ke baare mein thoda aur batayein, main S.19 care guide karungi.'
+          ? 'कोई बात नहीं। अपनी स्किन के बारे में थोड़ा और बताइए, मैं आपको S.19 केयर में गाइड करूँगी.'
           : 'No worries. Tell me a little more about your skin and I’ll guide you through the S.19 options.';
       setConversation(prev => [...prev, fallback]);
       speak(fallback, language);
