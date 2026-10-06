@@ -8,7 +8,7 @@ interface IXXAssistantProps {
 type Language = 'en' | 'hi' | 'te';
 
 const GREETINGS: Record<Language, string> = {
-  en: "Hi, I'm iks, your S.19 skin consultant. I'm here to understand what your skin needs right now and guide you to the S.19 care that fits. Tell me, what would you like to improve about your skin?",
+  en: "Hi, I'm ix, your S.19 skin consultant. I'm here to understand what your skin needs right now and guide you to the S.19 care that fits. Tell me, what would you like to improve about your skin?",
   hi: "नमस्ते, मैं iks हूँ, आपकी S.19 स्किन कंसल्टेंट। पहले मैं समझना चाहती हूँ कि अभी आपकी स्किन को क्या चाहिए, फिर मैं आपके लिए सही S.19 केयर सुझाऊँगी। आप अपनी स्किन में क्या सुधार करना चाहते हैं?",
   te: "హాయ్, నేను iks, మీ S.19 స్కిన్ కన్సల్టెంట్‌ని. ముందుగా మీ స్కిన్‌కి ఇప్పుడు ఏం అవసరమో అర్థం చేసుకుని, మీకు సరిపోయే S.19 కేర్‌ని సూచిస్తాను. మీ స్కిన్‌లో మీరు ఏం మెరుగుపరుచుకోవాలనుకుంటున్నారు?",
 };
@@ -81,14 +81,15 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
       setSpeaking(false);
       if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(value);
+        window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(value);
         utterance.lang = lang === 'te' ? 'te-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
         utterance.rate = 0.94;
         utterance.pitch = 1.08;
         utterance.onstart = () => setSpeaking(true);
         utterance.onend = () => setSpeaking(false);
         utterance.onerror = () => setSpeaking(false);
-        window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.cancel(); window.speechSynthesis.speak(utterance);
       }
     }
   };
