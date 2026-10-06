@@ -8,15 +8,15 @@ interface IXXAssistantProps {
 type Language = 'en' | 'hi' | 'te';
 
 const GREETINGS: Record<Language, string> = {
-  en: "Hi, I'm IXX, your S.19 skin consultant. I'm here to understand what your skin needs right now and guide you to the S.19 care that fits. Tell me, what would you like to improve about your skin?",
-  hi: "नमस्ते, मैं IXX हूँ, आपकी S.19 स्किन कंसल्टेंट। पहले मैं समझना चाहती हूँ कि अभी आपकी स्किन को क्या चाहिए, फिर मैं आपके लिए सही S.19 केयर सुझाऊँगी। आप अपनी स्किन में क्या सुधार करना चाहते हैं?",
-  te: "హాయ్, నేను IXX, మీ S.19 స్కిన్ కన్సల్టెంట్‌ని. ముందుగా మీ స్కిన్‌కి ఇప్పుడు ఏం అవసరమో అర్థం చేసుకుని, మీకు సరిపోయే S.19 కేర్‌ని సూచిస్తాను. మీ స్కిన్‌లో మీరు ఏం మెరుగుపరుచుకోవాలనుకుంటున్నారు?",
+  en: "Hi, I'm iks, your S.19 skin consultant. I'm here to understand what your skin needs right now and guide you to the S.19 care that fits. Tell me, what would you like to improve about your skin?",
+  hi: "नमस्ते, मैं iks हूँ, आपकी S.19 स्किन कंसल्टेंट। पहले मैं समझना चाहती हूँ कि अभी आपकी स्किन को क्या चाहिए, फिर मैं आपके लिए सही S.19 केयर सुझाऊँगी। आप अपनी स्किन में क्या सुधार करना चाहते हैं?",
+  te: "హాయ్, నేను iks, మీ S.19 స్కిన్ కన్సల్టెంట్‌ని. ముందుగా మీ స్కిన్‌కి ఇప్పుడు ఏం అవసరమో అర్థం చేసుకుని, మీకు సరిపోయే S.19 కేర్‌ని సూచిస్తాను. మీ స్కిన్‌లో మీరు ఏం మెరుగుపరుచుకోవాలనుకుంటున్నారు?",
 };
 
 const PLACEHOLDER: Record<Language, string> = {
-  en: 'Tell IXX what you want to improve…',
-  hi: 'IXX ki aap kya improve karna chahte hain cheppandi…',
-  te: 'Mee skin lo em improve cheyyalanukuntunnaro IXX ki cheppandi…',
+  en: 'Tell iks what you want to improve…',
+  hi: 'iks ki aap kya improve karna chahte hain cheppandi…',
+  te: 'Mee skin lo em improve cheyyalanukuntunnaro iks ki cheppandi…',
 };
 
 const LANG_LABELS = { en: 'English', hi: 'हिन्दी', te: 'తెలుగు' };
@@ -43,7 +43,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   const speak = async (value: string, lang: Language = language) => {
     if (!value || typeof window === 'undefined') return;
 
-    // Use OpenAI neural TTS instead of Chrome speechSynthesis. This gives IXX
+    // Use OpenAI neural TTS instead of Chrome speechSynthesis. This gives iks
     // a consistent female voice and much better multilingual pronunciation.
     try {
       audioRef.current?.pause();
@@ -102,7 +102,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   useEffect(() => {
     const timer = window.setTimeout(() => {
       // Browsers may block autoplay audio. We still attempt it immediately;
-      // the visible IXX card remains available for a one-click audio unlock.
+      // the visible iks card remains available for a one-click audio unlock.
       unlockAndWelcome();
     }, 450);
     return () => window.clearTimeout(timer);
@@ -132,14 +132,14 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
 
     try {
       const history = conversation.map((item, i) => ({ sender: i % 2 === 0 ? 'user' : 'assistant', text: item }));
-      const prompt = `You are IXX, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. For Telugu, use Telugu script (తెలుగు) rather than Roman Telugu. For Hindi, use Devanagari rather than Roman Hindi. Keep the response suitable for spoken audio, under 70 words.`;
+      const prompt = `You are iks, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. For Telugu, use Telugu script (తెలుగు) rather than Roman Telugu. For Hindi, use Devanagari rather than Roman Hindi. Keep the response suitable for spoken audio, under 70 words.`;
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: prompt, history, phase: '', product: '' }),
       });
       const data = await response.json();
-      const reply = data.reply || 'IXX is ready. Tell me a little more about what you want to improve.';
+      const reply = data.reply || 'iks is ready. Tell me a little more about what you want to improve.';
       setConversation(prev => [...prev, reply]);
       speak(reply, language);
     } catch (error) {
@@ -193,7 +193,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full bg-[#171715] text-[#F4F0E8] px-5 py-3 shadow-xl hover:bg-[#2A2926] transition-all"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C86D51] text-white font-semibold">I</span>
-        <span className="text-xs uppercase tracking-[0.18em]">Talk to IXX</span>
+        <span className="text-xs uppercase tracking-[0.18em]">Talk to iks</span>
       </button>
     );
   }
@@ -208,7 +208,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
             <div className="text-[10px] uppercase tracking-[0.18em] text-[#C9C3B8]">S.19 Skin Consultant</div>
           </div>
         </div>
-        <button onClick={() => { stopSpeaking(); setOpen(false); }} className="p-2 hover:bg-white/10 rounded-full" aria-label="Close IXX"><X className="w-4 h-4" /></button>
+        <button onClick={() => { stopSpeaking(); setOpen(false); }} className="p-2 hover:bg-white/10 rounded-full" aria-label="Close iks"><X className="w-4 h-4" /></button>
       </div>
 
       <div className="p-5 space-y-4">
@@ -219,7 +219,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         </div>
 
         <div className="rounded-xl border border-[#C9C3B8] bg-[#F4F0E8] p-4 min-h-[100px]">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[#6D6A63] mb-2"><Sparkles className="w-3.5 h-3.5 text-[#C86D51]" /> IXX is listening to you</div>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[#6D6A63] mb-2"><Sparkles className="w-3.5 h-3.5 text-[#C86D51]" /> iks is listening to you</div>
           <p className="text-sm leading-relaxed text-[#171715]">
             {conversation.length ? conversation[conversation.length - 1] : GREETINGS[language]}
           </p>
@@ -229,7 +229,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         <div className="flex items-center gap-2">
           <button onClick={listening ? () => recognitionRef.current?.stop?.() : startListening} disabled={thinking} className={`flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-3 text-xs uppercase tracking-[0.14em] font-medium ${listening ? 'bg-[#C86D51] text-white' : 'bg-[#171715] text-white'} disabled:opacity-50`}>
             {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            {listening ? 'Listening…' : 'Talk to IXX'}
+            {listening ? 'Listening…' : 'Talk to iks'}
           </button>
           <button onClick={speaking ? stopSpeaking : () => speak(conversation[conversation.length - 1] || GREETINGS[language])} className="rounded-full border border-[#C9C3B8] p-3" aria-label="Voice reply">
             {speaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
