@@ -5,342 +5,379 @@ interface IXXAssistantProps {
   onOpenFullChat: () => void;
 }
 
-type Language = 'en' | 'hi' | 'te';
+type Status = 'connecting' | 'ready' | 'listening' | 'speaking' | 'thinking' | 'error';
 
 const GREETING = "Hi, I'm IXX, your S.19 skin consultant. Tell me what's bothering you about your skin, and let's figure it out together.";
 
-const getSpeechRecognition = () => {
-  if (typeof window === 'undefined') return null;
-  const w = window as any;
-  return w.SpeechRecognition || w.webkitSpeechRecognition || null;
-};
+const SYSTEM_INSTRUCTION = `
+You are IXX, the friendly female voice consultant for S.19 Skinlabs.
 
-const detectLanguageFromText = (value: string): Language => {
-  if (/[\u0C00-\u0C7F]/.test(value)) return 'te';
-  if (/[\u0900-\u097F]/.test(value)) return 'hi';
+BRAND NAME:
+- The UI brand name is written exactly as IXX.
+- When speaking, pronounce IXX as one short syllable: "icks", like Vicks without the V.
+- Never spell the letters I-X-X aloud.
 
-  const t = value.toLowerCase();
-  const teWords = /\b(nenu|naaku|naku|mee|mi|mana|na|undi|unnadi|undhi|ela|em|enti|enduku|kani|kuda|chala|konchem|skin lo|skin ki|cheppandi|cheppu|kavali|kaavali|avuthundi|avutundi|pimples|mukham|mukhamlo|dry ga|oily ga|baaga|bagundi)\b/;
-  const hiWords = /\b(main|mujhe|mera|meri|aap|aapki|aapko|hai|hain|kya|kaise|kyun|thoda|bahut|lekin|bhi|skin mein|skin me|chehra|chahiye|chahte|chahti|batao|bataiye|ho raha|rahi)\b/;
-  const teScore = (t.match(new RegExp(teWords.source, 'g')) || []).length;
-  const hiScore = (t.match(new RegExp(hiWords.source, 'g')) || []).length;
-  if (teScore > hiScore && teScore > 0) return 'te';
-  if (hiScore > teScore && hiScore > 0) return 'hi';
-  return 'en';
-};
+VOICE AND PERSONALITY:
+- Sound warm, sweet, feminine, premium, playful and lightly humorous.
+- Speak briskly but clearly. Never sound robotic, formal, or like a translated script.
+- Ask only one question at a time.
+- Keep every response very short: normally 1–2 short sentences and under 35 words.
 
-const mixedStyleInstruction = (lang: Language) => {
-  if (lang === 'te') {
-    return 'Reply in natural conversational Telugu mixed with English the way a young Hyderabad/Indian customer naturally speaks. Do NOT use pure Telugu or formal/literary Telugu. Keep common skincare/product words in English (skin, dry, oily, marks, glow, routine, care, phase, cream, etc.) and mix English naturally throughout. Telugu should be the main language, but code-switch casually and sweetly.';
+LANGUAGE:
+- Automatically detect the customer's spoken language and reply in the same language.
+- For Telugu, Telugu must clearly dominate, with only a few natural English skincare words such as skin, dry, oily, marks, glow, routine, cream, okay.
+- For Hindi, Hindi must clearly dominate, with only a few natural English skincare words.
+- For English, use natural Indian English.
+- Do not switch languages unless the customer does.
+- Do not translate English sentence-by-sentence into Telugu or Hindi.
+
+S.19 CONSULTATION:
+Learn the customer's main concern, one useful detail at a time. Once there is enough information, recommend the most appropriate S.19 phase and product.
+
+PRODUCT KNOWLEDGE — ONLY USE THESE FACTS:
+1. DEHYDRATION — Hydrating Capsule Cream. For dry, tight or moisture-depleted skin. Hero actives: 5% 13D Hyaluronic Acid, 2% Hydroviton, 2% Pentavitin.
+2. OIL IMBALANCE — Sebum Control Capsule Cream. For excess oiliness, shine or congested-looking pores. Hero actives: 3% Encapsulated Salicylic Acid, 2% Tranexamic Acid, 0.5% Sebum Control Complex.
+3. UNEVEN TONE — TXA + NIA Capsule Cream. For visible marks, localized pigmentation or uneven-looking tone. Hero actives: 4% Tranexamic Acid, 2% Niacinamide, 2% Rose PDRN.
+4. RECOVERY — Care-First Barrier Pause. For heightened sensitivity, burning, significant irritation or post-procedure stress. It is care-first; active treatment creams are paused.
+
+SAFETY:
+- Never diagnose a medical condition.
+- Never promise a cure, permanent result, or guaranteed outcome.
+- Never invent dosage, frequency, price, stock, shipping, or ingredients beyond the facts above.
+- If the customer reports severe burning, swelling, a significant rash, an emergency symptom, or recent medical/cosmetic procedure with concerning symptoms, prioritize stopping active recommendations and advise appropriate professional medical care.
+- If skin sounds actively irritated or burning, prefer RECOVERY rather than an active phase.
+
+CONVERSATION:
+Start by asking what they want to improve. Be friendly and concise. Do not dump product information before understanding the concern.
+`;
+
+function base64FromArrayBuffer(buffer: ArrayBuffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   }
-  if (lang === 'hi') {
-    return 'Reply in natural conversational Indian Hindi mixed with English the way a young Indian customer naturally speaks. Do NOT use pure Hindi or formal/literary Hindi. Keep common skincare/product words in English (skin, dry, oily, marks, glow, routine, care, phase, cream, etc.) and mix English naturally throughout. Hindi should be the main language, but code-switch casually and sweetly.';
+  return btoa(binary);
+}
+
+function pcm16FromFloat32(input: Float32Array, inputRate: number, outputRate = 16000) {
+  if (inputRate === outputRate) {
+    const out = new Int16Array(input.length);
+    for (let i = 0; i < input.length; i++) out[i] = Math.max(-1, Math.min(1, input[i])) * 0x7fff;
+    return out;
   }
-  return 'Reply in natural Indian English. Keep it casual, warm and conversational.';
-};
+
+  const ratio = inputRate / outputRate;
+  const outputLength = Math.max(1, Math.floor(input.length / ratio));
+  const out = new Int16Array(outputLength);
+
+  for (let i = 0; i < outputLength; i++) {
+    const position = i * ratio;
+    const left = Math.floor(position);
+    const right = Math.min(left + 1, input.length - 1);
+    const weight = position - left;
+    const sample = input[left] * (1 - weight) + input[right] * weight;
+    out[i] = Math.max(-1, Math.min(1, sample)) * 0x7fff;
+  }
+  return out;
+}
+
+function int16ToArrayBuffer(samples: Int16Array) {
+  return samples.buffer.slice(samples.byteOffset, samples.byteOffset + samples.byteLength);
+}
+
+function pcm16ToAudioBuffer(ctx: AudioContext, base64: string, sampleRate = 24000) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  const samples = new Int16Array(bytes.buffer);
+  const buffer = ctx.createBuffer(1, samples.length, sampleRate);
+  const channel = buffer.getChannelData(0);
+  for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 0x8000;
+  return buffer;
+}
 
 export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) => {
   const [open, setOpen] = useState(true);
-  const [language, setLanguage] = useState<Language>('en');
-  const [speaking, setSpeaking] = useState(false);
-  const [listening, setListening] = useState(false);
-  const [thinking, setThinking] = useState(false);
+  const [status, setStatus] = useState<Status>('connecting');
   const [text, setText] = useState('');
-  const [conversation, setConversation] = useState<string[]>([]);
+  const [lastUserText, setLastUserText] = useState('');
+  const [lastAssistantText, setLastAssistantText] = useState(GREETING);
+  const [error, setError] = useState('');
 
-  const recognitionRef = useRef<any>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const ttsAbortRef = useRef<AbortController | null>(null);
-  const ttsRequestRef = useRef(0);
-  const consultationVersionRef = useRef(0);
-  const speakingRef = useRef(false);
-  const listeningRef = useRef(false);
-  const thinkingRef = useRef(false);
-  const hasWelcomed = useRef(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const silenceTimerRef = useRef<number | null>(null);
-  const maxListenTimerRef = useRef<number | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const speechDetectedRef = useRef(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const inputContextRef = useRef<AudioContext | null>(null);
+  const outputContextRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const playbackSourcesRef = useRef<AudioBufferSourceNode[]>([]);
+  const nextPlaybackTimeRef = useRef(0);
+  const mountedRef = useRef(true);
+  const connectedRef = useRef(false);
+  const greetedRef = useRef(false);
 
-  const stopMediaListening = () => {
-    if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
-    if (maxListenTimerRef.current) window.clearTimeout(maxListenTimerRef.current);
-    silenceTimerRef.current = null;
-    maxListenTimerRef.current = null;
-    mediaRecorderRef.current?.stop?.();
-    mediaRecorderRef.current = null;
-    mediaStreamRef.current?.getTracks().forEach(t => t.stop());
-    mediaStreamRef.current = null;
-    audioContextRef.current?.close?.();
-    audioContextRef.current = null;
-    analyserRef.current = null;
+  const stopPlayback = () => {
+    playbackSourcesRef.current.forEach(source => {
+      try { source.stop(); } catch { /* already stopped */ }
+      source.disconnect();
+    });
+    playbackSourcesRef.current = [];
+    nextPlaybackTimeRef.current = 0;
+    setStatus(prev => prev === 'speaking' ? 'listening' : prev);
   };
 
-  const stopSpeaking = () => {
-    ++ttsRequestRef.current;
-    ttsAbortRef.current?.abort();
-    ttsAbortRef.current = null;
-    window.speechSynthesis?.cancel();
-    audioRef.current?.pause();
-    if (audioRef.current) audioRef.current.currentTime = 0;
-    setSpeaking(false);
-    speakingRef.current = false;
+  const stopMicrophone = () => {
+    processorRef.current?.disconnect();
+    sourceRef.current?.disconnect();
+    processorRef.current = null;
+    sourceRef.current = null;
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    streamRef.current = null;
+    inputContextRef.current?.close().catch(() => undefined);
+    inputContextRef.current = null;
   };
 
-  const startListening = async (auto = false) => {
-    if (speakingRef.current || thinkingRef.current || listeningRef.current) return;
-
-    // Prefer server transcription so the customer can speak Telugu, Hindi,
-    // English or mixed speech without selecting a language first.
-    if (navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined') {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
-        const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
-        const recorder = new MediaRecorder(stream, { mimeType });
-        const chunks: Blob[] = [];
-        mediaRecorderRef.current = recorder;
-        speechDetectedRef.current = false;
-        setListening(true);
-        listeningRef.current = true;
-
-        recorder.ondataavailable = (e: BlobEvent) => { if (e.data.size) chunks.push(e.data); };
-        recorder.onstop = async () => {
-          stopMediaListening();
-          setListening(false);
-          listeningRef.current = false;
-          if (!chunks.length) return;
-          const blob = new Blob(chunks, { type: 'audio/webm' });
-          const reader = new FileReader();
-          reader.onloadend = async () => {
-            const base64 = String(reader.result).split(',')[1];
-            if (!base64) return;
-            try {
-              const response = await fetch('/api/transcribe', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ audio: base64, mimeType: recorder.mimeType || 'audio/webm' }),
-              });
-              if (!response.ok) throw new Error('Transcription failed');
-              const data = await response.json();
-              const transcript = String(data.text || '').trim();
-              if (transcript) {
-                const detected = (data.language === 'te' || data.language === 'hi' || data.language === 'en')
-                  ? data.language as Language
-                  : detectLanguageFromText(transcript);
-                setLanguage(detected);
-                setText(transcript);
-                await sendToIXX(transcript, detected);
-              }
-            } catch {
-              // If server transcription is unavailable, fall back to Chrome recognition.
-              startBrowserRecognition();
-            }
-          };
-          reader.readAsDataURL(blob);
-        };
-
-        // Simple voice activity detection: start with 1.5s grace, then stop
-        // after ~1.1s of silence. Hard cap prevents an open microphone.
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-        if (AudioCtx) {
-          const ctx = new AudioCtx();
-          audioContextRef.current = ctx;
-          const source = ctx.createMediaStreamSource(stream);
-          const analyser = ctx.createAnalyser();
-          analyser.fftSize = 1024;
-          source.connect(analyser);
-          analyserRef.current = analyser;
-          const data = new Uint8Array(analyser.fftSize);
-          const check = () => {
-            if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== 'recording') return;
-            analyser.getByteTimeDomainData(data);
-            let sum = 0;
-            for (let i = 0; i < data.length; i++) {
-              const v = (data[i] - 128) / 128;
-              sum += v * v;
-            }
-            const rms = Math.sqrt(sum / data.length);
-            if (rms > 0.025) {
-              speechDetectedRef.current = true;
-              if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
-              silenceTimerRef.current = null;
-            } else if (speechDetectedRef.current && !silenceTimerRef.current) {
-              silenceTimerRef.current = window.setTimeout(() => mediaRecorderRef.current?.stop(), 1000);
-            }
-            requestAnimationFrame(check);
-          };
-          requestAnimationFrame(check);
-        }
-
-        recorder.start();
-        maxListenTimerRef.current = window.setTimeout(() => recorder.stop(), 12000);
-        return;
-      } catch {
-        stopMediaListening();
-      }
+  const closeSession = () => {
+    stopMicrophone();
+    stopPlayback();
+    outputContextRef.current?.close().catch(() => undefined);
+    outputContextRef.current = null;
+    if (wsRef.current) {
+      try { wsRef.current.close(); } catch { /* ignore */ }
+      wsRef.current = null;
     }
-
-    startBrowserRecognition();
+    connectedRef.current = false;
   };
 
-  const startBrowserRecognition = () => {
-    const Recognition = getSpeechRecognition();
-    if (!Recognition) return;
-    recognitionRef.current?.stop?.();
-    const recognition = new Recognition();
-    recognition.lang = 'en-IN';
-    recognition.interimResults = false;
-    recognition.continuous = false;
-    recognition.onstart = () => { setListening(true); listeningRef.current = true; };
-    recognition.onend = () => { setListening(false); listeningRef.current = false; };
-    recognition.onerror = () => { setListening(false); listeningRef.current = false; };
-    recognition.onresult = (event: any) => {
-      const transcript = event.results?.[0]?.[0]?.transcript || '';
-      if (transcript) {
-        const detected = detectLanguageFromText(transcript);
-        setLanguage(detected);
-        setText(transcript);
-        sendToIXX(transcript, detected);
-      }
+  const playAudioChunk = (base64: string) => {
+    const ctx = outputContextRef.current;
+    if (!ctx) return;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => undefined);
+
+    const buffer = pcm16ToAudioBuffer(ctx, base64, 24000);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+
+    const startAt = Math.max(ctx.currentTime + 0.015, nextPlaybackTimeRef.current || ctx.currentTime + 0.015);
+    source.start(startAt);
+    nextPlaybackTimeRef.current = startAt + buffer.duration;
+    playbackSourcesRef.current.push(source);
+    source.onended = () => {
+      playbackSourcesRef.current = playbackSourcesRef.current.filter(item => item !== source);
+      source.disconnect();
     };
-    recognitionRef.current = recognition;
-    recognition.start();
   };
 
-  const speak = async (value: string, lang: Language = language) => {
-    if (!value || typeof window === 'undefined') return;
-    const requestId = ++ttsRequestRef.current;
-    ttsAbortRef.current?.abort();
-    ttsAbortRef.current = new AbortController();
-    stopMediaListening();
-    recognitionRef.current?.stop?.();
-    window.speechSynthesis?.cancel();
-    audioRef.current?.pause();
+  const connectGemini = async () => {
+    if (connectedRef.current || wsRef.current) return;
+    setError('');
+    setStatus('connecting');
 
     try {
-      setSpeaking(true);
-      speakingRef.current = true;
-      const speechText = value
-        .replace(/\bIXX\b/gi, 'icks')
-        .replace(/S\.19/gi, lang === 'te' ? 'ఎస్ నైన్టీన్' : lang === 'hi' ? 'एस नाइन्टीन' : 'S nineteen');
-      const response = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: speechText, language: lang }),
-        signal: ttsAbortRef.current.signal,
-      });
-      if (!response.ok) throw new Error('TTS request failed');
-      const blob = await response.blob();
-      if (requestId !== ttsRequestRef.current) return;
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      audioRef.current = audio;
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        if (requestId !== ttsRequestRef.current) return;
-        setSpeaking(false);
-        speakingRef.current = false;
-        window.setTimeout(() => {
-          if (!thinkingRef.current && !listeningRef.current) startListening(true);
-        }, 150);
-      };
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        if (requestId === ttsRequestRef.current) {
-          setSpeaking(false);
-          speakingRef.current = false;
+      const tokenResponse = await fetch('/api/gemini-live-token', { method: 'POST' });
+      const tokenData = await tokenResponse.json();
+      if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.error || 'Gemini Live token unavailable');
+
+      const outputContext = new AudioContext({ sampleRate: 24000 });
+      outputContextRef.current = outputContext;
+
+      const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(tokenData.token)}`);
+      wsRef.current = ws;
+
+      ws.onopen = async () => {
+        const setup = {
+          setup: {
+            model: 'models/gemini-3.8-live',
+            generationConfig: {
+              responseModalities: ['AUDIO'],
+              speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } } },
+            },
+            systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
+            inputAudioTranscription: {},
+            outputAudioTranscription: {},
+            realtimeInputConfig: {
+              automaticActivityDetection: {
+                disabled: false,
+                prefixPaddingMs: 180,
+                silenceDurationMs: 650,
+              },
+            },
+            contextWindowCompression: { slidingWindow: {} },
+          },
+        };
+        ws.send(JSON.stringify(setup));
+        connectedRef.current = true;
+
+        try {
+          await startMicrophone();
+        } catch (micError: any) {
+          setError(micError?.message || 'Microphone permission is required for voice mode.');
+          setStatus('ready');
         }
       };
-      await audio.play();
-    } catch (error: any) {
-      if (error?.name === 'AbortError' || requestId !== ttsRequestRef.current) return;
-      setSpeaking(false);
-      speakingRef.current = false;
-      if ('speechSynthesis' in window) {
-        const utterance = new SpeechSynthesisUtterance(value.replace(/\bIXX\b/gi, 'icks'));
-        utterance.lang = lang === 'te' ? 'te-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
-        utterance.rate = 1.4;
-        utterance.pitch = 1.08;
-        utterance.onstart = () => { setSpeaking(true); speakingRef.current = true; };
-        utterance.onend = () => {
-          setSpeaking(false); speakingRef.current = false;
-          window.setTimeout(() => { if (!thinkingRef.current && !listeningRef.current) startListening(true); }, 150);
-        };
-        utterance.onerror = () => { setSpeaking(false); speakingRef.current = false; };
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.speak(utterance);
-      }
+
+      ws.onmessage = event => {
+        if (!mountedRef.current) return;
+        let message: any;
+        try { message = JSON.parse(event.data); } catch { return; }
+        if (message.setupComplete) {
+          window.setTimeout(sendGreeting, 250);
+          return;
+        }
+
+        const content = message.serverContent;
+        if (!content) return;
+
+        if (content.interrupted) {
+          stopPlayback();
+          setStatus('listening');
+        }
+
+        if (content.inputTranscription?.text) {
+          const incoming = String(content.inputTranscription.text).trim();
+          if (incoming) {
+            setLastUserText(prev => `${prev} ${incoming}`.trim().slice(-500));
+            setStatus('thinking');
+          }
+        }
+
+        if (content.outputTranscription?.text) {
+          const outgoing = String(content.outputTranscription.text).trim();
+          if (outgoing) setLastAssistantText(prev => `${prev} ${outgoing}`.trim());
+        }
+
+        const parts = content.modelTurn?.parts || [];
+        for (const part of parts) {
+          if (part.inlineData?.data) {
+            setStatus('speaking');
+            playAudioChunk(part.inlineData.data);
+          }
+        }
+
+        if (content.turnComplete) {
+          window.setTimeout(() => {
+            if (mountedRef.current && playbackSourcesRef.current.length === 0) setStatus('listening');
+          }, 100);
+        }
+      };
+
+      ws.onerror = () => {
+        if (!mountedRef.current) return;
+        setError('Gemini Live could not connect. Check your GEMINI_API_KEY and Gemini API access.');
+        setStatus('error');
+      };
+
+      ws.onclose = () => {
+        if (!mountedRef.current) return;
+        connectedRef.current = false;
+        wsRef.current = null;
+        if (status !== 'error') setStatus('ready');
+      };
+    } catch (err: any) {
+      setError(err?.message || 'Unable to start Gemini Live.');
+      setStatus('error');
     }
   };
 
-  const sendToIXX = async (userText: string, detectedLanguage?: Language) => {
-    const clean = userText.trim();
-    if (!clean || thinkingRef.current) return;
-    const requestVersion = consultationVersionRef.current;
-    const requestLanguage = detectedLanguage || detectLanguageFromText(clean);
-    setLanguage(requestLanguage);
+  const startMicrophone = async () => {
+    if (streamRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    });
+    streamRef.current = stream;
+
+    const ctx = new AudioContext();
+    inputContextRef.current = ctx;
+    if (ctx.state === 'suspended') await ctx.resume();
+
+    const source = ctx.createMediaStreamSource(stream);
+    const processor = ctx.createScriptProcessor(4096, 1, 1);
+    sourceRef.current = source;
+    processorRef.current = processor;
+
+    processor.onaudioprocess = event => {
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+      const input = event.inputBuffer.getChannelData(0);
+      const pcm = pcm16FromFloat32(input, ctx.sampleRate, 16000);
+      if (!pcm.length) return;
+      ws.send(JSON.stringify({
+        realtimeInput: {
+          audio: {
+            data: base64FromArrayBuffer(int16ToArrayBuffer(pcm)),
+            mimeType: 'audio/pcm;rate=16000',
+          },
+        },
+      }));
+      if (status !== 'speaking') setStatus('listening');
+    };
+
+    const mute = ctx.createGain();
+    mute.gain.value = 0;
+    source.connect(processor);
+    processor.connect(mute);
+    mute.connect(ctx.destination);
+    setStatus('listening');
+  };
+
+  const sendText = (value: string) => {
+    const clean = value.trim();
+    const ws = wsRef.current;
+    if (!clean || !ws || ws.readyState !== WebSocket.OPEN) return;
+    setLastUserText(clean);
     setText('');
-    stopSpeaking();
-    setConversation(prev => [...prev, clean]);
-    setThinking(true);
-    thinkingRef.current = true;
-    try {
-      const history = conversation.map((item, i) => ({ sender: i % 2 === 0 ? 'user' : 'assistant', text: item }));
-      const prompt = `You are IXX, the friendly S.19 Skinlabs voice consultant. The customer said: "${clean}". Previous notes: ${conversation.join(' | ')}. Detect and follow the customer's natural language style. ${mixedStyleInstruction(requestLanguage)} Ask at most one useful follow-up question when needed. When you have enough information, recommend the appropriate S.19 phase/product and briefly explain why. Never diagnose, invent product facts, dosage, price or claims. Be sweet, warm, lightly humorous and a little playful, never cringe. Keep it VERY short: 1 or 2 short sentences, ideally 15-30 words, maximum 35 words. IMPORTANT: keep the customer's main language dominant. For Telugu, at least about 75-85% of the sentence should be Telugu; use English only for a few naturally used words like skin, dry, oily, marks, glow, routine, cream, okay, actually, etc. For Hindi, at least about 75-85% should be Hindi, with only a few natural English words. Do NOT translate English sentence-by-sentence into Telugu/Hindi and do NOT overuse English. Do not switch languages unless the customer does.`;
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: prompt, history, phase: '', product: '', language: requestLanguage }),
-      });
-      const data = await response.json();
-      if (requestVersion !== consultationVersionRef.current) return;
-      const reply = data.reply || 'Tell me a little more about your skin and we will figure it out together.';
-      const finalLanguage = (data.detectedLanguage === 'te' || data.detectedLanguage === 'hi' || data.detectedLanguage === 'en') ? data.detectedLanguage as Language : requestLanguage;
-      setLanguage(finalLanguage);
-      setConversation(prev => [...prev, reply]);
-      await speak(reply, finalLanguage);
-    } catch {
-      const fallback = requestLanguage === 'te'
-        ? 'Okay, cheppandi… mee skin lo exact ga em bother chesthondi? Let’s figure it out together 😊'
-        : requestLanguage === 'hi'
-          ? 'Okay, bataiye… skin mein exactly kya bother kar raha hai? Let’s figure it out together 😊'
-          : 'Okay, tell me what is bothering your skin. We’ll figure it out together 😊';
-      setConversation(prev => [...prev, fallback]);
-      await speak(fallback, requestLanguage);
-    } finally {
-      setThinking(false);
-      thinkingRef.current = false;
-    }
+    setStatus('thinking');
+    ws.send(JSON.stringify({ realtimeInput: { text: clean } }));
+  };
+
+  const sendGreeting = () => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN || greetedRef.current) return;
+    greetedRef.current = true;
+    setLastAssistantText(GREETING);
+    ws.send(JSON.stringify({ clientContent: { turns: [{ role: 'user', parts: [{ text: 'Start the consultation now. Give the customer a warm, very short greeting and ask what they want to improve about their skin.' }] }], turnComplete: true } }));
   };
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      if (!hasWelcomed.current) {
-        hasWelcomed.current = true;
-        speak(GREETING, 'en');
-      }
-    }, 450);
-    return () => window.clearTimeout(timer);
+    mountedRef.current = true;
+    connectGemini();
+    return () => {
+      mountedRef.current = false;
+      closeSession();
+    };
+    // Connect only once when the homepage mounts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => () => {
-    stopSpeaking();
-    stopMediaListening();
-    recognitionRef.current?.stop?.();
+  useEffect(() => {
+    const unlock = () => {
+      outputContextRef.current?.resume().catch(() => undefined);
+    };
+    window.addEventListener('pointerdown', unlock, { once: true });
+    return () => window.removeEventListener('pointerdown', unlock);
   }, []);
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full bg-[#171715] text-[#F4F0E8] px-5 py-3 shadow-xl hover:bg-[#2A2926] transition-all">
+      <button onClick={() => { setOpen(true); connectGemini(); }} className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full bg-[#171715] text-[#F4F0E8] px-5 py-3 shadow-xl hover:bg-[#2A2926] transition-all">
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C86D51] text-white font-semibold">I</span>
         <span className="text-xs uppercase tracking-[0.18em]">Talk to IXX</span>
       </button>
     );
   }
+
+  const listening = status === 'listening';
+  const speaking = status === 'speaking';
+  const thinking = status === 'thinking' || status === 'connecting';
 
   return (
     <aside className="fixed bottom-5 right-5 z-50 w-[min(390px,calc(100vw-24px))] overflow-hidden rounded-2xl border border-[#C9C3B8] bg-[#FAF8F4] shadow-[0_18px_60px_rgba(23,23,21,0.18)]">
@@ -349,26 +386,28 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#C86D51] text-white font-semibold text-lg">I</div>
           <div><div className="text-sm font-semibold tracking-wide">IXX</div><div className="text-[10px] uppercase tracking-[0.18em] text-[#C9C3B8]">S.19 Skin Consultant</div></div>
         </div>
-        <button onClick={() => { stopSpeaking(); stopMediaListening(); setOpen(false); }} className="p-2 hover:bg-white/10 rounded-full" aria-label="Close IXX"><X className="w-4 h-4" /></button>
+        <button onClick={() => { closeSession(); setOpen(false); }} className="p-2 hover:bg-white/10 rounded-full" aria-label="Close IXX"><X className="w-4 h-4" /></button>
       </div>
 
       <div className="p-5 space-y-4">
-        <div className="rounded-xl border border-[#C9C3B8] bg-[#F4F0E8] p-4 min-h-[100px]">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[#6D6A63] mb-2"><Sparkles className="w-3.5 h-3.5 text-[#C86D51]" /> {listening ? 'IXX is listening to you' : speaking ? 'IXX is speaking' : thinking ? 'IXX is thinking' : 'IXX is ready'}</div>
-          <p className="text-sm leading-relaxed text-[#171715]">{conversation.length ? conversation[conversation.length - 1] : GREETING}</p>
-          {thinking && <div className="mt-3 flex items-center gap-2 text-xs text-[#6D6A63]"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Thinking about your skin…</div>}
+        <div className="rounded-xl border border-[#C9C3B8] bg-[#F4F0E8] p-4 min-h-[118px]">
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[#6D6A63] mb-2"><Sparkles className="w-3.5 h-3.5 text-[#C86D51]" /> {listening ? 'IXX is listening to you' : speaking ? 'IXX is speaking' : thinking ? 'IXX is connecting' : status === 'error' ? 'IXX needs attention' : 'IXX is ready'}</div>
+          <p className="text-sm leading-relaxed text-[#171715]">{lastAssistantText}</p>
+          {lastUserText && <p className="mt-2 text-xs leading-relaxed text-[#6D6A63]">You: {lastUserText}</p>}
+          {error && <p className="mt-3 text-xs leading-relaxed text-[#9A4A36]">{error}</p>}
+          {thinking && !error && <div className="mt-3 flex items-center gap-2 text-xs text-[#6D6A63]"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Getting IXX ready…</div>}
         </div>
 
         <div className="flex items-center gap-2">
-          <button onClick={listening ? () => stopMediaListening() : startListening} disabled={thinking || speaking} className={`flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-3 text-xs uppercase tracking-[0.14em] font-medium ${listening ? 'bg-[#C86D51] text-white' : 'bg-[#171715] text-white'} disabled:opacity-50`}>
+          <button onClick={listening ? stopMicrophone : startMicrophone} disabled={status === 'connecting' || status === 'error'} className={`flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-3 text-xs uppercase tracking-[0.14em] font-medium ${listening ? 'bg-[#C86D51] text-white' : 'bg-[#171715] text-white'} disabled:opacity-50`}>
             {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}{listening ? 'Listening…' : 'Talk to IXX'}
           </button>
-          <button onClick={speaking ? stopSpeaking : () => speak(conversation[conversation.length - 1] || GREETING, language)} className="rounded-full border border-[#C9C3B8] p-3" aria-label="Voice reply">{speaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
+          <button onClick={speaking ? stopPlayback : () => outputContextRef.current?.resume()} className="rounded-full border border-[#C9C3B8] p-3" aria-label="Voice reply">{speaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}</button>
         </div>
 
-        <div className="flex gap-2">
-          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendToIXX(text); }} placeholder="Tell IXX what you want to improve…" className="min-w-0 flex-1 rounded-full border border-[#C9C3B8] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#171715]" />
-          <button onClick={() => sendToIXX(text)} disabled={!text.trim() || thinking} className="rounded-full bg-[#171715] p-3 text-white disabled:opacity-40"><ArrowUpRight className="w-4 h-4" /></button>
+        <div className="flex items-center gap-2">
+          <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') sendText(text); }} placeholder="Type to IXX if you prefer…" className="min-w-0 flex-1 rounded-full border border-[#C9C3B8] bg-white px-4 py-2.5 text-sm outline-none focus:border-[#171715]" />
+          <button onClick={() => sendText(text)} disabled={!text.trim() || status === 'connecting'} className="rounded-full bg-[#171715] p-3 text-white disabled:opacity-40"><ArrowUpRight className="w-4 h-4" /></button>
         </div>
 
         <button onClick={onOpenFullChat} className="w-full text-center text-[11px] uppercase tracking-[0.14em] text-[#6D6A63] hover:text-[#171715]">Open full S.19 AI assistant ↗</button>
