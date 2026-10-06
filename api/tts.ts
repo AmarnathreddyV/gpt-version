@@ -15,10 +15,10 @@ export default async function handler(req: any, res: any) {
     if (!text) return res.status(400).json({ error: 'text is required' });
     const client = new OpenAI({ apiKey: key });
     const instructions = language === 'te'
-      ? 'You are IXX, a warm female skincare consultant speaking to an Indian customer. Speak fluent, natural Telugu as a native Indian Telugu speaker. Use conversational Hyderabad-style Telugu where appropriate, not a translated or foreign accent. Keep pronunciation clear, soft, feminine, warm, calm and premium. Do not switch to English except for brand/product names such as S.19.'
+      ? 'You are iks, a warm female skincare consultant speaking to an Indian customer. Speak fluent, natural Telugu as a native Indian Telugu speaker. Use conversational Hyderabad-style Telugu where appropriate, not a translated or foreign accent. Keep pronunciation clear, soft, feminine, warm, calm and premium. Do not switch to English except for brand/product names such as S.19.'
       : language === 'hi'
-        ? 'You are IXX, a warm female skincare consultant speaking to an Indian customer. Speak fluent, natural Hindi with an Indian female voice. Keep pronunciation clear, soft, warm, calm and premium. Do not switch languages except for brand/product names such as S.19.'
-        : 'You are IXX, a warm female skincare consultant. Speak natural Indian English with a soft, friendly, feminine, calm and premium tone.';
+        ? 'You are iks, a warm female skincare consultant speaking to an Indian customer. Speak fluent, natural Hindi with an Indian female voice. Keep pronunciation clear, soft, warm, calm and premium. Do not switch languages except for brand/product names such as S.19.'
+        : 'You are iks, a warm female skincare consultant. Speak natural Indian English with a soft, friendly, feminine, calm and premium tone.';
     const speech = await client.audio.speech.create({
       model: 'gpt-4o-mini-tts',
       voice: 'coral',
@@ -32,7 +32,7 @@ export default async function handler(req: any, res: any) {
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).send(buffer);
   } catch (err: any) {
-    console.error('IXX TTS error:', err);
+    console.error('iks TTS error:', err);
     return res.status(500).json({ error: 'Voice generation failed' });
   }
 }
