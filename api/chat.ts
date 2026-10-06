@@ -96,7 +96,16 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const { message, phase, product, history } = body || {};
+    const { message, phase, product, history, language } = body || {};
+
+    const requestedLanguage = language === 'te' || language === 'hi' || language === 'en' ? language : null;
+    const languageInstruction = requestedLanguage === 'te'
+      ? '\n[VOICE LANGUAGE LOCK] The selected response language is TELUGU. Reply ONLY in natural Telugu script. Do NOT reply in Hindi, English, or Roman Telugu. This instruction has higher priority than the language of the user prompt or previous messages.\n'
+      : requestedLanguage === 'hi'
+        ? '\n[VOICE LANGUAGE LOCK] The selected response language is HINDI. Reply ONLY in natural Hindi Devanagari. Do NOT reply in Telugu, English, or Roman Hindi. This instruction has higher priority than the language of the user prompt or previous messages.\n'
+        : requestedLanguage === 'en'
+          ? '\n[VOICE LANGUAGE LOCK] The selected response language is ENGLISH. Reply ONLY in English. Do NOT reply in Telugu or Hindi.\n'
+          : '';
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
@@ -113,7 +122,7 @@ export default async function handler(req: any, res: any) {
     if (openai) {
       try {
         const openAiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-          { role: 'system', content: S19_SYSTEM_INSTRUCTION },
+          { role: 'system', content: S19_SYSTEM_INSTRUCTION + languageInstruction },
         ];
 
         if (Array.isArray(history)) {
@@ -171,7 +180,7 @@ export default async function handler(req: any, res: any) {
           model: 'gemini-3.8-flash',
           contents: chatContents,
           config: {
-            systemInstruction: S19_SYSTEM_INSTRUCTION,
+            systemInstruction: S19_SYSTEM_INSTRUCTION + languageInstruction,
             temperature: 0.7,
           },
         });
@@ -190,7 +199,27 @@ export default async function handler(req: any, res: any) {
     const ph = (phase || '').toLowerCase();
     let replyText = '';
 
-    if (p.includes('sebum') || ph.includes('oil')) {
+    if (requestedLanguage === 'te') {
+      if (p.includes('sebum') || ph.includes('oil')) {
+        replyText = 'ఆయిలీనెస్ మీ ప్రధాన సమస్య అయితే, S.19 ఆయిల్ ఇంబ్యాలెన్స్ ఫేజ్‌ను సూచిస్తుంది. మీ స్కిన్‌కు సరిపోయే కేర్‌ను కలిసి చూద్దాం.';
+      } else if (p.includes('txa') || p.includes('nia') || ph.includes('tone')) {
+        replyText = 'అసమానమైన స్కిన్ టోన్ లేదా కనిపించే మార్క్స్ మీ ప్రధాన సమస్య అయితే, S.19 Uneven Tone Phase మీకు సరైన దిశ కావచ్చు.';
+      } else if (ph.includes('recovery')) {
+        replyText = 'ఇప్పుడు మీ స్కిన్‌కు కాస్త బ్రేక్ ఇద్దాం. Recovery Phaseలో gentle barrier careకి ప్రాధాన్యత ఇస్తాం.';
+      } else {
+        replyText = 'డ్రైనెస్ లేదా టైట్‌గా అనిపిస్తే, S.19 Dehydration Phase మీ స్కిన్‌కు అవసరమైన hydration వైపు గైడ్ చేస్తుంది.';
+      }
+    } else if (requestedLanguage === 'hi') {
+      if (p.includes('sebum') || ph.includes('oil')) {
+        replyText = 'अगर आपकी मुख्य चिंता ऑयलीनेस है, तो S.19 Oil Imbalance Phase आपकी स्किन की ज़रूरत के हिसाब से सही दिशा हो सकती है।';
+      } else if (p.includes('txa') || p.includes('nia') || ph.includes('tone')) {
+        replyText = 'अगर आपकी मुख्य चिंता uneven tone या visible marks हैं, तो S.19 Uneven Tone Phase सही दिशा हो सकती है।';
+      } else if (ph.includes('recovery')) {
+        replyText = 'अभी आपकी स्किन को थोड़ा ब्रेक देते हैं। Recovery Phase में gentle barrier care को प्राथमिकता दी जाती है।';
+      } else {
+        replyText = 'अगर स्किन dry या tight महसूस होती है, तो S.19 Dehydration Phase hydration पर ध्यान देती है।';
+      }
+    } else if (p.includes('sebum') || ph.includes('oil')) {
       replyText = `For the Oil Imbalance Phase, S.19 recommends the Sebum Control Capsule Cream. Its hero actives are 3% Encapsulated Salicylic Acid, 2% Tranexamic Acid, and 0.5% Sebum Control Complex, formulated to support pore clarity and balanced surface sebum.`;
     } else if (p.includes('txa') || p.includes('nia') || ph.includes('tone')) {
       replyText = `For the Uneven Tone Phase, S.19 recommends the TXA + NIA Capsule Cream featuring 4% Tranexamic Acid, 2% Niacinamide, and 2% Rose PDRN to clarify visible marks and promote skin tone uniformity.`;
