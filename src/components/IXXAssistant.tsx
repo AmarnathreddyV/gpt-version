@@ -9,14 +9,14 @@ type Language = 'en' | 'hi' | 'te';
 
 const GREETINGS: Record<Language, string> = {
   en: "Hi, I'm ix, your S.19 skin consultant. I'm here to understand what your skin needs right now and guide you to the S.19 care that fits. Tell me, what would you like to improve about your skin?",
-  hi: "नमस्ते, मैं iks हूँ, आपकी S.19 स्किन कंसल्टेंट। पहले मैं समझना चाहती हूँ कि अभी आपकी स्किन को क्या चाहिए, फिर मैं आपके लिए सही S.19 केयर सुझाऊँगी। आप अपनी स्किन में क्या सुधार करना चाहते हैं?",
-  te: "హాయ్, నేను iks, మీ S.19 స్కిన్ కన్సల్టెంట్‌ని. ముందుగా మీ స్కిన్‌కి ఇప్పుడు ఏం అవసరమో అర్థం చేసుకుని, మీకు సరిపోయే S.19 కేర్‌ని సూచిస్తాను. మీ స్కిన్‌లో మీరు ఏం మెరుగుపరుచుకోవాలనుకుంటున్నారు?",
+  hi: "नमस्ते, मैं ix हूँ, आपकी S.19 स्किन कंसल्टेंट। पहले मैं समझना चाहती हूँ कि अभी आपकी स्किन को क्या चाहिए, फिर मैं आपके लिए सही S.19 केयर सुझाऊँगी। आप अपनी स्किन में क्या सुधार करना चाहते हैं?",
+  te: "హాయ్, నేను ix, మీ S.19 స్కిన్ కన్సల్టెంట్‌ని. ముందుగా మీ స్కిన్‌కి ఇప్పుడు ఏం అవసరమో అర్థం చేసుకుని, మీకు సరిపోయే S.19 కేర్‌ని సూచిస్తాను. మీ స్కిన్‌లో మీరు ఏం మెరుగుపరుచుకోవాలనుకుంటున్నారు?",
 };
 
 const PLACEHOLDER: Record<Language, string> = {
-  en: 'Tell iks what you want to improve…',
-  hi: 'iks ki aap kya improve karna chahte hain cheppandi…',
-  te: 'Mee skin lo em improve cheyyalanukuntunnaro iks ki cheppandi…',
+  en: 'Tell IXX what you want to improve…',
+  hi: 'IXX se aap kya improve karna chahte hain batayein…',
+  te: 'Mee skin lo em improve cheyyalanukuntunnaro IXX ki cheppandi…',
 };
 
 const LANG_LABELS = { en: 'English', hi: 'हिन्दी', te: 'తెలుగు' };
@@ -39,57 +39,78 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   const hasWelcomed = useRef(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const ttsAbortRef = useRef<AbortController | null>(null);
+  const ttsRequestRef = useRef(0);
+  const consultationVersionRef = useRef(0);
 
   const speak = async (value: string, lang: Language = language) => {
     if (!value || typeof window === 'undefined') return;
 
-    // Use OpenAI neural TTS instead of Chrome speechSynthesis. This gives iks
-    // a consistent female voice and much better multilingual pronunciation.
-    try {
-      audioRef.current?.pause();
-      if (audioRef.current) audioRef.current.currentTime = 0;
+    const requestId = ++ttsRequestRef.current;
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = new AbortController();
 
+    // Stop every previous voice before starting the new one.
+    window.speechSynthesis?.cancel();
+    audioRef.current?.pause();
+    if (audioRef.current) audioRef.current.currentTime = 0;
+
+    try {
       setSpeaking(true);
-      const speechText = lang === 'te'
-        ? value.replace(/S\.19/gi, 'ఎస్ నైన్టీన్')
-        : lang === 'hi'
-          ? value.replace(/S\.19/gi, 'एस नाइन्टीन')
-          : value.replace(/S\.19/gi, 'S nineteen');
+
+      // Keep the visual brand as "IXX", but tell TTS to pronounce it as "ix".
+      const speechText = value
+        .replace(/\bIXX\b/gi, 'ix')
+        .replace(/S\.19/gi, lang === 'te' ? 'ఎస్ నైన్టీన్' : lang === 'hi' ? 'एस नाइन्टीन' : 'S nineteen');
+
       const response = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: speechText, language: lang }),
+        signal: ttsAbortRef.current.signal,
       });
 
       if (!response.ok) throw new Error('TTS request failed');
+      if (requestId !== ttsRequestRef.current) return;
 
       const blob = await response.blob();
+      if (requestId !== ttsRequestRef.current) return;
+
       const url = URL.createObjectURL(blob);
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => {
-        setSpeaking(false);
+        if (requestId === ttsRequestRef.current) setSpeaking(false);
         URL.revokeObjectURL(url);
       };
       audio.onerror = () => {
-        setSpeaking(false);
+        if (requestId === ttsRequestRef.current) setSpeaking(false);
         URL.revokeObjectURL(url);
       };
+
+      // Only the latest requested language/response is allowed to play.
+      if (requestId !== ttsRequestRef.current) {
+        URL.revokeObjectURL(url);
+        return;
+      }
       await audio.play();
-    } catch {
-      // Fallback only if the neural TTS endpoint is unavailable.
+    } catch (error: any) {
+      if (error?.name === 'AbortError' || requestId !== ttsRequestRef.current) return;
+
+      // Browser fallback only if the neural TTS endpoint is unavailable.
       setSpeaking(false);
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(value);
+        const utterance = new SpeechSynthesisUtterance(
+          value.replace(/\bIXX\b/gi, 'ix')
+        );
         utterance.lang = lang === 'te' ? 'te-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
-        utterance.rate = 0.94;
+        utterance.rate = 1.2;
         utterance.pitch = 1.08;
         utterance.onstart = () => setSpeaking(true);
         utterance.onend = () => setSpeaking(false);
         utterance.onerror = () => setSpeaking(false);
-        window.speechSynthesis.cancel(); window.speechSynthesis.speak(utterance);
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
       }
     }
   };
@@ -118,6 +139,9 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   }, []);
 
   const stopSpeaking = () => {
+    ++ttsRequestRef.current;
+    ttsAbortRef.current?.abort();
+    ttsAbortRef.current = null;
     window.speechSynthesis?.cancel();
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;
@@ -127,30 +151,36 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   const sendToIXX = async (userText: string) => {
     const clean = userText.trim();
     if (!clean || thinking) return;
+    const requestLanguage = language;
+    const requestVersion = consultationVersionRef.current;
     setText('');
+    stopSpeaking();
     setConversation(prev => [...prev, clean]);
     setThinking(true);
 
     try {
       const history = conversation.map((item, i) => ({ sender: i % 2 === 0 ? 'user' : 'assistant', text: item }));
-      const prompt = `You are iks, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. For Telugu, use Telugu script (తెలుగు) rather than Roman Telugu. For Hindi, use Devanagari rather than Roman Hindi. Keep the response suitable for spoken audio, under 70 words.`;
+      const prompt = `You are IXX, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. For Telugu, use Telugu script (తెలుగు) rather than Roman Telugu. For Hindi, use Devanagari rather than Roman Hindi. Keep the response suitable for spoken audio, under 70 words.`;
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: prompt, history, phase: '', product: '' }),
       });
       const data = await response.json();
-      const reply = data.reply || 'iks is ready. Tell me a little more about what you want to improve.';
+      if (requestVersion !== consultationVersionRef.current || requestLanguage !== language) return;
+      const reply = data.reply || 'IXX is ready. Tell me a little more about what you want to improve.';
       setConversation(prev => [...prev, reply]);
-      speak(reply, language);
+      speak(reply, requestLanguage);
     } catch (error) {
       const fallback = language === 'te'
         ? 'పర్లేదు. మీ స్కిన్ గురించి కొంచెం ఇంకా చెప్పండి, నేను S.19 కేర్‌లో మీకు గైడ్ చేస్తాను.'
         : language === 'hi'
           ? 'कोई बात नहीं। अपनी स्किन के बारे में थोड़ा और बताइए, मैं आपको S.19 केयर में गाइड करूँगी.'
           : 'No worries. Tell me a little more about your skin and I’ll guide you through the S.19 options.';
-      setConversation(prev => [...prev, fallback]);
-      speak(fallback, language);
+      if (requestVersion === consultationVersionRef.current && requestLanguage === language) {
+        setConversation(prev => [...prev, fallback]);
+        speak(fallback, requestLanguage);
+      }
     } finally {
       setThinking(false);
     }
@@ -182,9 +212,11 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   };
 
   const switchLanguage = (next: Language) => {
+    ++consultationVersionRef.current;
+    recognitionRef.current?.stop?.();
     stopSpeaking();
     setLanguage(next);
-    setTimeout(() => speak(GREETINGS[next], next), 100);
+    window.setTimeout(() => speak(GREETINGS[next], next), 120);
   };
 
   if (!open) {
@@ -194,7 +226,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-full bg-[#171715] text-[#F4F0E8] px-5 py-3 shadow-xl hover:bg-[#2A2926] transition-all"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C86D51] text-white font-semibold">I</span>
-        <span className="text-xs uppercase tracking-[0.18em]">Talk to iks</span>
+        <span className="text-xs uppercase tracking-[0.18em]">Talk to IXX</span>
       </button>
     );
   }
@@ -209,7 +241,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
             <div className="text-[10px] uppercase tracking-[0.18em] text-[#C9C3B8]">S.19 Skin Consultant</div>
           </div>
         </div>
-        <button onClick={() => { stopSpeaking(); setOpen(false); }} className="p-2 hover:bg-white/10 rounded-full" aria-label="Close iks"><X className="w-4 h-4" /></button>
+        <button onClick={() => { stopSpeaking(); setOpen(false); }} className="p-2 hover:bg-white/10 rounded-full" aria-label="Close IXX"><X className="w-4 h-4" /></button>
       </div>
 
       <div className="p-5 space-y-4">
@@ -220,7 +252,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         </div>
 
         <div className="rounded-xl border border-[#C9C3B8] bg-[#F4F0E8] p-4 min-h-[100px]">
-          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[#6D6A63] mb-2"><Sparkles className="w-3.5 h-3.5 text-[#C86D51]" /> iks is listening to you</div>
+          <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.16em] text-[#6D6A63] mb-2"><Sparkles className="w-3.5 h-3.5 text-[#C86D51]" /> IXX is listening to you</div>
           <p className="text-sm leading-relaxed text-[#171715]">
             {conversation.length ? conversation[conversation.length - 1] : GREETINGS[language]}
           </p>
@@ -230,7 +262,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         <div className="flex items-center gap-2">
           <button onClick={listening ? () => recognitionRef.current?.stop?.() : startListening} disabled={thinking} className={`flex-1 flex items-center justify-center gap-2 rounded-full px-4 py-3 text-xs uppercase tracking-[0.14em] font-medium ${listening ? 'bg-[#C86D51] text-white' : 'bg-[#171715] text-white'} disabled:opacity-50`}>
             {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            {listening ? 'Listening…' : 'Talk to iks'}
+            {listening ? 'Listening…' : 'Talk to IXX'}
           </button>
           <button onClick={speaking ? stopSpeaking : () => speak(conversation[conversation.length - 1] || GREETINGS[language])} className="rounded-full border border-[#C9C3B8] p-3" aria-label="Voice reply">
             {speaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
