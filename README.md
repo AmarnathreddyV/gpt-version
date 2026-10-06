@@ -1,4 +1,4 @@
-# S19 Skinlabs — IXX Gemini Live Voice Assistant (V5)
+# S19 Skinlabs — IXX Gemini Live Voice Assistant (V6)
 
 This version fixes the ephemeral-token schema issue seen in the previous deployment.
 
@@ -8,7 +8,7 @@ The current Gemini Live API auth-token schema uses `bidiGenerateContentSetup` fo
 
 `Unknown name "liveConnectConstraints" at 'auth_token'`
 
-V5 locks only the Live model and lets the browser send the voice, system instruction, audio, and VAD configuration in the initial WebSocket setup.
+V6 locks only the Live model and lets the browser send the voice, system instruction, audio, and VAD configuration in the initial WebSocket setup.
 
 ## Vercel
 
