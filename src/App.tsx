@@ -7,6 +7,7 @@ import { Assessment } from './components/Assessment';
 import { VisualPhasePicker } from './components/VisualPhasePicker';
 import { ResultPage } from './components/ResultPage';
 import { ChatAssistant } from './components/ChatAssistant';
+import { IXXAssistant } from './components/IXXAssistant';
 import { SkinPhaseId, StoredSessionContext } from './types';
 import { SKIN_PHASES } from './data/phases';
 
@@ -161,6 +162,10 @@ export default function App() {
 
       {/* Minimal Editorial Footer */}
       <Footer navigate={navigate} />
+
+      {currentRoute === '/' && (
+        <IXXAssistant onOpenFullChat={() => navigate('/chat')} />
+      )}
     </div>
   );
 }

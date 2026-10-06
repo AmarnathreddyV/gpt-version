@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Send, ArrowLeft, Mic, Square, Volume2, VolumeX, Globe2 } from 'lucide-react';
+import { ArrowUpRight, Sparkles, Send, ArrowLeft, RotateCcw } from 'lucide-react';
 import { ChatMessage, SkinPhaseId } from '../types';
 import { SKIN_PHASES } from '../data/phases';
 
@@ -10,21 +10,11 @@ interface ChatAssistantProps {
 }
 
 const QUICK_PROMPTS = [
-  'Tell me about S.19',
-  'Explain all S.19 products',
   'Why was this product recommended?',
   'What are the key ingredients?',
-  'How does S.19 find my skin phase?',
+  'How should I use it?',
+  'Can I use it with my current routine?',
 ];
-
-type VoiceLanguage = 'auto' | 'en-IN' | 'hi-IN' | 'te-IN';
-
-const VOICE_LANGUAGE_LABELS: Record<VoiceLanguage, string> = {
-  auto: 'Auto',
-  'en-IN': 'English',
-  'hi-IN': 'Hindi',
-  'te-IN': 'Telugu',
-};
 
 export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   currentPhaseId,
@@ -63,19 +53,11 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
 
   const [inputMessage, setInputMessage] = useState('');
   const [isThinking, setIsThinking] = useState(false);
-  const [voiceLanguage, setVoiceLanguage] = useState<VoiceLanguage>('auto');
-  const [isRecording, setIsRecording] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voiceStatus, setVoiceStatus] = useState('Tap the microphone and talk to S.19');
-  const [autoSpeak, setAutoSpeak] = useState(true);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingChunksRef = useRef<Blob[]>([]);
-  const recordingTimerRef = useRef<number | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'init-1',
       sender: 'assistant',
-      text: "Hi, I'm your S.19 skin consultant. I'm here to make skincare feel simple and personal. You can ask me about S.19, our skin phases, products, ingredients, or your recommendation — and you can also talk to me in English, Hindi, or Telugu.",
+      text: "Hi. I'm your S.19 skin assistant. Based on your current phase, I can help you understand your recommendation and answer questions about S.19 products.",
       timestamp: Date.now(),
     },
   ]);
@@ -85,158 +67,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isThinking]);
-
-  const languageForVoice = voiceLanguage === 'auto' ? 'en-IN' : voiceLanguage;
-  const apiVoiceLanguage = voiceLanguage === 'auto' ? undefined : voiceLanguage;
-
-  const stopSpeaking = () => {
-    window.speechSynthesis?.cancel();
-    setIsSpeaking(false);
-  };
-
-  const speakWithBrowserFallback = (text: string) => {
-    if (!('speechSynthesis' in window)) {
-      setVoiceStatus('Voice playback is not available in this browser.');
-      return;
-    }
-
-    stopSpeaking();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = languageForVoice;
-    utterance.rate = 0.96;
-    utterance.pitch = 1.0;
-    utterance.onstart = () => setIsSpeaking(true);
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    window.speechSynthesis.speak(utterance);
-  };
-
-  const speakReply = async (text: string) => {
-    if (!text) return;
-    setVoiceStatus('S.19 is speaking...');
-
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, language: apiVoiceLanguage }),
-      });
-
-      if (!res.ok) throw new Error('TTS API unavailable');
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      setIsSpeaking(true);
-      audio.onended = () => {
-        URL.revokeObjectURL(url);
-        setIsSpeaking(false);
-        setVoiceStatus('Tap the microphone and talk to S.19');
-      };
-      audio.onerror = () => {
-        URL.revokeObjectURL(url);
-        setIsSpeaking(false);
-        speakWithBrowserFallback(text);
-      };
-      await audio.play();
-    } catch {
-      speakWithBrowserFallback(text);
-    }
-  };
-
-  const blobToBase64 = (blob: Blob) => new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const result = String(reader.result || '');
-      resolve(result.includes(',') ? result.split(',')[1] : result);
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-
-  const transcribeVoice = async (blob: Blob) => {
-    const audioBase64 = await blobToBase64(blob);
-    const res = await fetch('/api/transcribe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        audioBase64,
-        mimeType: blob.type || 'audio/webm',
-        language: voiceLanguage === 'auto' ? undefined : voiceLanguage.split('-')[0],
-      }),
-    });
-
-    if (!res.ok) throw new Error('Transcription API unavailable');
-    const data = await res.json();
-    if (!data.text) throw new Error('No speech detected');
-    return data.text as string;
-  };
-
-  const startRecording = async () => {
-    if (isRecording || isThinking) return;
-    stopSpeaking();
-
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
-      setVoiceStatus('Voice recording is not supported in this browser.');
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : 'audio/webm';
-      const recorder = new MediaRecorder(stream, { mimeType });
-      recordingChunksRef.current = [];
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
-      };
-
-      recorder.onstop = async () => {
-        stream.getTracks().forEach((track) => track.stop());
-        setIsRecording(false);
-        if (recordingTimerRef.current) {
-          window.clearTimeout(recordingTimerRef.current);
-          recordingTimerRef.current = null;
-        }
-
-        const blob = new Blob(recordingChunksRef.current, { type: mimeType });
-        if (!blob.size) {
-          setVoiceStatus('I could not hear anything. Please try again.');
-          return;
-        }
-
-        setVoiceStatus('Listening carefully and understanding you...');
-        try {
-          const transcript = await transcribeVoice(blob);
-          setInputMessage(transcript);
-          setVoiceStatus(`I heard: “${transcript}”`);
-          await handleSendMessage(transcript);
-        } catch (error) {
-          console.warn('Voice transcription failed:', error);
-          setVoiceStatus('I could not understand that. Please try again.');
-          setIsThinking(false);
-        }
-      };
-
-      recorder.start();
-      setIsRecording(true);
-      setVoiceStatus('Listening... speak naturally about S.19.');
-      recordingTimerRef.current = window.setTimeout(() => {
-        if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
-      }, 30000);
-    } catch (error) {
-      console.warn('Microphone permission failed:', error);
-      setVoiceStatus('Please allow microphone access to use S.19 Voice.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop();
-    }
-  };
 
   const handleSendMessage = async (textToSend?: string) => {
     const text = (textToSend || inputMessage).trim();
@@ -283,12 +113,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
           timestamp: Date.now(),
         },
       ]);
-
-      if (autoSpeak) {
-        await speakReply(replyText);
-      } else {
-        setVoiceStatus('Reply ready. Tap the speaker if you want to hear it.');
-      }
     } catch (err: any) {
       console.warn('Network or server chat issue, using clinical knowledge base:', err);
 
@@ -325,19 +149,10 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
           timestamp: Date.now(),
         },
       ]);
-      if (autoSpeak) await speakReply(fallbackReply);
     } finally {
       setIsThinking(false);
     }
   };
-
-  useEffect(() => {
-    return () => {
-      if (recordingTimerRef.current) window.clearTimeout(recordingTimerRef.current);
-      mediaRecorderRef.current?.stream.getTracks().forEach((track) => track.stop());
-      window.speechSynthesis?.cancel();
-    };
-  }, []);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -405,77 +220,6 @@ export const ChatAssistant: React.FC<ChatAssistantProps> = ({
           >
             Change phase
           </button>
-        </div>
-      </div>
-
-      {/* Voice Consultant */}
-      <div className="mb-6 border border-[#C9C3B8] bg-[#FAF8F4] p-5 sm:p-6 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <Mic className="w-4 h-4 text-[#C86D51]" />
-              <span className="text-[10px] uppercase tracking-[0.2em] font-medium text-[#C86D51]">S.19 VOICE CONSULTANT</span>
-            </div>
-            <p className="text-sm text-[#6D6A63]">Talk naturally. I can explain S.19, your skin phase, products, ingredients and care.</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Globe2 className="w-4 h-4 text-[#6D6A63]" />
-            <select
-              value={voiceLanguage}
-              onChange={(e) => setVoiceLanguage(e.target.value as VoiceLanguage)}
-              className="bg-[#F4F0E8] border border-[#C9C3B8] px-3 py-2 text-xs text-[#171715] focus:outline-none"
-              aria-label="Voice language"
-            >
-              {(Object.keys(VOICE_LANGUAGE_LABELS) as VoiceLanguage[]).map((lang) => (
-                <option key={lang} value={lang}>{VOICE_LANGUAGE_LABELS[lang]}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="mt-5 flex flex-col sm:flex-row items-center gap-3">
-          <button
-            type="button"
-            onClick={isRecording ? stopRecording : startRecording}
-            disabled={isThinking && !isRecording}
-            className={`w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 text-sm transition-colors cursor-pointer ${
-              isRecording ? 'bg-[#C86D51] text-white' : 'bg-[#171715] text-[#F4F0E8] hover:bg-[#2A2926]'
-            } disabled:bg-[#C9C3B8]/60 disabled:cursor-not-allowed`}
-          >
-            {isRecording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            {isRecording ? 'Finish speaking' : 'Talk to S.19'}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              if (isSpeaking) stopSpeaking();
-              else {
-                const lastReply = [...messages].reverse().find((m) => m.sender === 'assistant');
-                if (lastReply) speakReply(lastReply.text);
-              }
-            }}
-            className="inline-flex items-center justify-center gap-2 px-4 py-3 border border-[#C9C3B8] text-xs text-[#171715] hover:border-[#171715] transition-colors cursor-pointer"
-            aria-label={isSpeaking ? 'Stop speaking' : 'Speak latest reply'}
-          >
-            {isSpeaking ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            {isSpeaking ? 'Stop voice' : 'Hear reply'}
-          </button>
-
-          <label className="inline-flex items-center gap-2 text-xs text-[#6D6A63] cursor-pointer">
-            <input
-              type="checkbox"
-              checked={autoSpeak}
-              onChange={(e) => setAutoSpeak(e.target.checked)}
-              className="accent-[#171715]"
-            />
-            Speak replies automatically
-          </label>
-        </div>
-
-        <div className="mt-3 text-[11px] text-[#6D6A63] min-h-[16px]" aria-live="polite">
-          {voiceStatus}
         </div>
       </div>
 
