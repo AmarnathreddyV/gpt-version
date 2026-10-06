@@ -1,27 +1,19 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# S19 Skinlabs — IXX Gemini Live Voice Assistant (V4)
 
-# Run and deploy your AI Studio app
+This version fixes the ephemeral-token schema issue seen in the previous deployment.
 
-This contains everything you need to run your app locally.
+## Important fix
 
-View your app in AI Studio: https://ai.studio/apps/0e49066a-558c-4b66-b079-298421958f46
+The current Gemini Live API auth-token schema uses `bidiGenerateContentSetup` for the constrained setup object. Earlier versions sent `liveConnectConstraints`, which caused:
 
-## Run Locally
+`Unknown name "liveConnectConstraints" at 'auth_token'`
 
-**Prerequisites:**  Node.js
+V4 locks only the Live model and lets the browser send the voice, system instruction, audio, and VAD configuration in the initial WebSocket setup.
 
+## Vercel
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Set:
 
-## Gemini Live token fix (v2)
+`GEMINI_API_KEY=your_gemini_api_key`
 
-IXX now uses `/api/gemini-live-token-v2`. The token is provisioned through the official Gemini REST `auth_tokens` endpoint and the browser connects through the `BidiGenerateContentConstrained` Live API endpoint. This avoids the previous SDK auth-token serialization issue.
-
-Vercel environment variable required:
-- `GEMINI_API_KEY`
+Then redeploy.
