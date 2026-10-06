@@ -42,6 +42,9 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
   const ttsAbortRef = useRef<AbortController | null>(null);
   const ttsRequestRef = useRef(0);
   const consultationVersionRef = useRef(0);
+  const speakingRef = useRef(false);
+  const listeningRef = useRef(false);
+  const thinkingRef = useRef(false);
 
   const speak = async (value: string, lang: Language = language) => {
     if (!value || typeof window === 'undefined') return;
@@ -57,10 +60,11 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
 
     try {
       setSpeaking(true);
+      speakingRef.current = true;
 
-      // Keep the visual brand as "IXX", but tell TTS to pronounce it as "ix".
+      // Keep the visual brand as "IXX", but tell TTS to pronounce it like the word "Vicks" without the V — "icks".
       const speechText = value
-        .replace(/\bIXX\b/gi, 'ix')
+        .replace(/\bIXX\b/gi, 'icks')
         .replace(/S\.19/gi, lang === 'te' ? 'ఎస్ నైన్టీన్' : lang === 'hi' ? 'एस नाइन्टीन' : 'S nineteen');
 
       const response = await fetch('/api/tts', {
@@ -80,12 +84,24 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => {
-        if (requestId === ttsRequestRef.current) setSpeaking(false);
+        if (requestId === ttsRequestRef.current) {
+          setSpeaking(false);
+          speakingRef.current = false;
+          // IXX automatically opens the microphone for the customer's next answer.
+          window.setTimeout(() => {
+            if (requestId === ttsRequestRef.current && !thinkingRef.current && !listeningRef.current) {
+              startListening(true);
+            }
+          }, 120);
+        }
         URL.revokeObjectURL(url);
       };
       audio.onerror = () => {
-        if (requestId === ttsRequestRef.current) setSpeaking(false);
-        URL.revokeObjectURL(url);
+        if (requestId === ttsRequestRef.current) {
+        setSpeaking(false);
+        speakingRef.current = false;
+      }
+      URL.revokeObjectURL(url);
       };
 
       // Only the latest requested language/response is allowed to play.
@@ -99,16 +115,21 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
 
       // Browser fallback only if the neural TTS endpoint is unavailable.
       setSpeaking(false);
+      speakingRef.current = false;
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(
-          value.replace(/\bIXX\b/gi, 'ix')
+          value.replace(/\bIXX\b/gi, 'icks')
         );
         utterance.lang = lang === 'te' ? 'te-IN' : lang === 'hi' ? 'hi-IN' : 'en-IN';
-        utterance.rate = 1.2;
+        utterance.rate = 1.3;
         utterance.pitch = 1.08;
-        utterance.onstart = () => setSpeaking(true);
-        utterance.onend = () => setSpeaking(false);
-        utterance.onerror = () => setSpeaking(false);
+        utterance.onstart = () => { setSpeaking(true); speakingRef.current = true; };
+        utterance.onend = () => {
+          setSpeaking(false);
+          speakingRef.current = false;
+          window.setTimeout(() => { if (!thinkingRef.current && !listeningRef.current) startListening(true); }, 120);
+        };
+        utterance.onerror = () => { setSpeaking(false); speakingRef.current = false; };
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
       }
@@ -146,6 +167,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
     audioRef.current?.pause();
     if (audioRef.current) audioRef.current.currentTime = 0;
     setSpeaking(false);
+        speakingRef.current = false;
   };
 
   const sendToIXX = async (userText: string) => {
@@ -157,10 +179,11 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
     stopSpeaking();
     setConversation(prev => [...prev, clean]);
     setThinking(true);
+    thinkingRef.current = true;
 
     try {
       const history = conversation.map((item, i) => ({ sender: i % 2 === 0 ? 'user' : 'assistant', text: item }));
-      const prompt = `You are IXX, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. For Telugu, use Telugu script (తెలుగు) rather than Roman Telugu. For Hindi, use Devanagari rather than Roman Hindi. Keep the response suitable for spoken audio, under 70 words.`;
+      const prompt = `You are IXX, the friendly S.19 Skinlabs voice consultant. Conduct a short, warm skincare consultation. The customer said: "${clean}". Previous consultation notes: ${conversation.join(' | ')}. Ask at most one useful follow-up question if more information is needed. Once you have enough information, recommend the most appropriate S.19 phase and product and briefly explain why. Never diagnose, never invent product facts, and follow all S.19 safety rules. Reply naturally in ${LANG_LABELS[language]}. For Telugu, use Telugu script (తెలుగు) rather than Roman Telugu. For Hindi, use Devanagari rather than Roman Hindi. Reply only in the selected language and do not continue in English after a language change. Use natural, conversational Indian speech. Be sweet, warm and lightly humorous when appropriate—small playful lines are welcome, but never forced. Keep it concise and easy to speak, under 60 words.`;
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -183,15 +206,18 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
       }
     } finally {
       setThinking(false);
+      thinkingRef.current = false;
     }
   };
 
-  const startListening = () => {
-    unlockAndWelcome();
+  const startListening = (auto = false) => {
+    if (speakingRef.current || thinkingRef.current) return;
     const Recognition = getSpeechRecognition();
     if (!Recognition) {
-      const msg = 'Voice input is not available in this browser. You can type your answer below.';
-      speak(msg, 'en');
+      if (!auto) {
+        const msg = language === 'te' ? 'ఈ బ్రౌజర్‌లో వాయిస్ ఇన్‌పుట్ అందుబాటులో లేదు. క్రింద టైప్ చేయవచ్చు.' : language === 'hi' ? 'इस ब्राउज़र में वॉइस इनपुट उपलब्ध नहीं है। आप नीचे टाइप कर सकते हैं।' : 'Voice input is not available in this browser. You can type below.';
+        speak(msg, language);
+      }
       return;
     }
     recognitionRef.current?.stop?.();
@@ -199,9 +225,9 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
     recognition.lang = language === 'te' ? 'te-IN' : language === 'hi' ? 'hi-IN' : 'en-IN';
     recognition.interimResults = false;
     recognition.continuous = false;
-    recognition.onstart = () => setListening(true);
-    recognition.onend = () => setListening(false);
-    recognition.onerror = () => setListening(false);
+    recognition.onstart = () => { setListening(true); listeningRef.current = true; };
+    recognition.onend = () => { setListening(false); listeningRef.current = false; };
+    recognition.onerror = () => { setListening(false); listeningRef.current = false; };
     recognition.onresult = (event: any) => {
       const transcript = event.results?.[0]?.[0]?.transcript || '';
       setText(transcript);
