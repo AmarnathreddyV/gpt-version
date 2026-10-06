@@ -7,7 +7,7 @@ interface IXXAssistantProps {
 
 type Status = 'connecting' | 'ready' | 'listening' | 'speaking' | 'thinking' | 'error';
 
-const GREETING = "Hi, I'm IXX, your S.19 skin consultant. Tell me what's bothering you about your skin, and let's figure it out together.";
+const GREETING = "Hi, I'm IXX, your S.19 skin consultant. What would you like to improve about your skin?";
 
 const SYSTEM_INSTRUCTION = `
 You are IXX, the friendly female voice consultant for S.19 Skinlabs.
@@ -186,6 +186,13 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
 
       const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tokenData.token)}`);
       wsRef.current = ws;
+      const setupTimeout = window.setTimeout(() => {
+        if (!connectedRef.current && mountedRef.current) {
+          setError('Gemini Live is taking too long to start. Please refresh and try again.');
+          setStatus('error');
+          try { ws.close(); } catch { /* ignore */ }
+        }
+      }, 8000);
 
       ws.onopen = async () => {
         const setup = {
@@ -193,30 +200,22 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
             model: 'models/gemini-3.8-live',
             generationConfig: {
               responseModalities: ['AUDIO'],
+              maxOutputTokens: 80,
               speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } } },
             },
             systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-            inputAudioTranscription: {},
-            outputAudioTranscription: {},
             realtimeInputConfig: {
               automaticActivityDetection: {
                 disabled: false,
-                prefixPaddingMs: 180,
-                silenceDurationMs: 650,
+                prefixPaddingMs: 100,
+                silenceDurationMs: 300,
               },
+              activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
+              turnCoverage: 'TURN_INCLUDES_ONLY_ACTIVITY',
             },
-            contextWindowCompression: { slidingWindow: {} },
           },
         };
         ws.send(JSON.stringify(setup));
-        connectedRef.current = true;
-
-        try {
-          await startMicrophone();
-        } catch (micError: any) {
-          setError(micError?.message || 'Microphone permission is required for voice mode.');
-          setStatus('ready');
-        }
       };
 
       ws.onmessage = event => {
@@ -224,7 +223,23 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         let message: any;
         try { message = JSON.parse(event.data); } catch { return; }
         if (message.setupComplete) {
-          window.setTimeout(sendGreeting, 250);
+          // Gemini requires the client to wait for setupComplete before sending
+          // any additional messages, including microphone audio. Starting the
+          // mic earlier caused the first user turn to race the setup handshake.
+          connectedRef.current = true;
+          window.clearTimeout(setupTimeout);
+          sendGreeting();
+          startMicrophone().catch((micError: any) => {
+            setError(micError?.message || 'Microphone permission is required for voice mode.');
+            setStatus('ready');
+          });
+          return;
+        }
+
+        if (message.error) {
+          const detail = message.error?.message || 'Gemini Live returned an error.';
+          setError(detail);
+          setStatus('error');
           return;
         }
 
@@ -242,11 +257,6 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
             setLastUserText(prev => `${prev} ${incoming}`.trim().slice(-500));
             setStatus('thinking');
           }
-        }
-
-        if (content.outputTranscription?.text) {
-          const outgoing = String(content.outputTranscription.text).trim();
-          if (outgoing) setLastAssistantText(prev => `${prev} ${outgoing}`.trim());
         }
 
         const parts = content.modelTurn?.parts || [];
@@ -271,6 +281,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
       };
 
       ws.onclose = () => {
+        window.clearTimeout(setupTimeout);
         if (!mountedRef.current) return;
         connectedRef.current = false;
         wsRef.current = null;
@@ -300,7 +311,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
     if (ctx.state === 'suspended') await ctx.resume();
 
     const source = ctx.createMediaStreamSource(stream);
-    const processor = ctx.createScriptProcessor(4096, 1, 1);
+    const processor = ctx.createScriptProcessor(2048, 1, 1);
     sourceRef.current = source;
     processorRef.current = processor;
 
@@ -318,7 +329,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
           },
         },
       }));
-      if (status !== 'speaking') setStatus('listening');
+      setStatus(prev => prev === 'speaking' ? prev : 'listening');
     };
 
     const mute = ctx.createGain();
