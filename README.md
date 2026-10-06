@@ -18,3 +18,10 @@ View your app in AI Studio: https://ai.studio/apps/0e49066a-558c-4b66-b079-29842
 2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
 3. Run the app:
    `npm run dev`
+
+## Gemini Live token fix (v2)
+
+IXX now uses `/api/gemini-live-token-v2`. The token is provisioned through the official Gemini REST `auth_tokens` endpoint and the browser connects through the `BidiGenerateContentConstrained` Live API endpoint. This avoids the previous SDK auth-token serialization issue.
+
+Vercel environment variable required:
+- `GEMINI_API_KEY`
