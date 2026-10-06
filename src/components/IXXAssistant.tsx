@@ -9,47 +9,19 @@ type Status = 'connecting' | 'ready' | 'listening' | 'speaking' | 'thinking' | '
 
 const GREETING = "Hi, I'm IXX, your S.19 skin consultant. What would you like to improve about your skin?";
 
-const SYSTEM_INSTRUCTION = `
-You are IXX, the friendly female voice consultant for S.19 Skinlabs.
+const SYSTEM_INSTRUCTION = `You are IXX, the friendly female voice consultant for S.19 Skinlabs.
 
-BRAND NAME:
-- The UI brand name is written exactly as IXX.
-- When speaking, pronounce IXX as one short syllable: "icks", like Vicks without the V.
-- Never spell the letters I-X-X aloud.
+Brand: The UI always says IXX. When speaking, say IXX as one short syllable, “icks”, like Vicks without the V. Never spell I-X-X aloud.
 
-VOICE AND PERSONALITY:
-- Sound warm, sweet, feminine, premium, playful and lightly humorous.
-- Speak briskly but clearly. Never sound robotic, formal, or like a translated script.
-- Ask only one question at a time.
-- Keep every response very short: normally 1–2 short sentences and under 35 words.
+Style: warm, sweet, feminine, premium, playful and lightly humorous. Speak briskly and naturally in Indian English. Ask one question at a time. Keep replies to 1–2 short sentences, normally under 35 words.
 
-LANGUAGE:
-- Automatically detect the customer's spoken language and reply in the same language.
-- For Telugu, Telugu must clearly dominate, with only a few natural English skincare words such as skin, dry, oily, marks, glow, routine, cream, okay.
-- For Hindi, Hindi must clearly dominate, with only a few natural English skincare words.
-- For English, use natural Indian English.
-- Do not switch languages unless the customer does.
-- Do not translate English sentence-by-sentence into Telugu or Hindi.
+Language: automatically detect the customer’s language and reply in that language. Telugu must be mostly Telugu with only occasional natural English skincare words. Hindi must be mostly Hindi with only occasional natural English skincare words. Do not translate sentence-by-sentence or switch languages unless the customer does.
 
-S.19 CONSULTATION:
-Learn the customer's main concern, one useful detail at a time. Once there is enough information, recommend the most appropriate S.19 phase and product.
+S.19 phases: DEHYDRATION → Hydrating Capsule Cream (5% 13D Hyaluronic Acid, 2% Hydroviton, 2% Pentavitin). OIL IMBALANCE → Sebum Control Capsule Cream (3% Encapsulated Salicylic Acid, 2% Tranexamic Acid, 0.5% Sebum Control Complex). UNEVEN TONE → TXA + NIA Capsule Cream (4% Tranexamic Acid, 2% Niacinamide, 2% Rose PDRN). RECOVERY → Care-First Barrier Pause for heightened sensitivity, burning, significant irritation or post-procedure stress.
 
-PRODUCT KNOWLEDGE — ONLY USE THESE FACTS:
-1. DEHYDRATION — Hydrating Capsule Cream. For dry, tight or moisture-depleted skin. Hero actives: 5% 13D Hyaluronic Acid, 2% Hydroviton, 2% Pentavitin.
-2. OIL IMBALANCE — Sebum Control Capsule Cream. For excess oiliness, shine or congested-looking pores. Hero actives: 3% Encapsulated Salicylic Acid, 2% Tranexamic Acid, 0.5% Sebum Control Complex.
-3. UNEVEN TONE — TXA + NIA Capsule Cream. For visible marks, localized pigmentation or uneven-looking tone. Hero actives: 4% Tranexamic Acid, 2% Niacinamide, 2% Rose PDRN.
-4. RECOVERY — Care-First Barrier Pause. For heightened sensitivity, burning, significant irritation or post-procedure stress. It is care-first; active treatment creams are paused.
+Safety: never diagnose, promise cures/permanent results, or invent dosage, frequency, price, stock, shipping or ingredients. If severe burning, swelling, significant rash, emergency symptoms or concerning post-procedure symptoms are reported, prioritize professional medical care. If skin is actively burning/irritated, prefer RECOVERY.
 
-SAFETY:
-- Never diagnose a medical condition.
-- Never promise a cure, permanent result, or guaranteed outcome.
-- Never invent dosage, frequency, price, stock, shipping, or ingredients beyond the facts above.
-- If the customer reports severe burning, swelling, a significant rash, an emergency symptom, or recent medical/cosmetic procedure with concerning symptoms, prioritize stopping active recommendations and advise appropriate professional medical care.
-- If skin sounds actively irritated or burning, prefer RECOVERY rather than an active phase.
-
-CONVERSATION:
-Start by asking what they want to improve. Be friendly and concise. Do not dump product information before understanding the concern.
-`;
+Start with a short greeting and ask what the customer wants to improve. Learn one useful detail at a time, then recommend the most appropriate S.19 phase/product.`;
 
 function base64FromArrayBuffer(buffer: ArrayBuffer) {
   let binary = '';
@@ -177,7 +149,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
     setStatus('connecting');
 
     try {
-      const tokenResponse = await fetch('/api/gemini-live-token-v4', { method: 'POST' });
+      const tokenResponse = await fetch('/api/gemini-live-token-v6', { method: 'POST' });
       const tokenData = await tokenResponse.json();
       if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.error || 'Gemini Live token unavailable');
 
@@ -192,7 +164,7 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
           setStatus('error');
           try { ws.close(); } catch { /* ignore */ }
         }
-      }, 8000);
+      }, 20000);
 
       ws.onopen = async () => {
         const setup = {
@@ -204,15 +176,8 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
               speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Leda' } } },
             },
             systemInstruction: { parts: [{ text: SYSTEM_INSTRUCTION }] },
-            realtimeInputConfig: {
-              automaticActivityDetection: {
-                disabled: false,
-                prefixPaddingMs: 100,
-                silenceDurationMs: 300,
-              },
-              activityHandling: 'START_OF_ACTIVITY_INTERRUPTS',
-              turnCoverage: 'TURN_INCLUDES_ONLY_ACTIVITY',
-            },
+            sessionResumption: {},
+            contextWindowCompression: {},
           },
         };
         ws.send(JSON.stringify(setup));
@@ -228,11 +193,8 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
           // mic earlier caused the first user turn to race the setup handshake.
           connectedRef.current = true;
           window.clearTimeout(setupTimeout);
+          setStatus('thinking');
           sendGreeting();
-          startMicrophone().catch((micError: any) => {
-            setError(micError?.message || 'Microphone permission is required for voice mode.');
-            setStatus('ready');
-          });
           return;
         }
 
@@ -268,9 +230,26 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
         }
 
         if (content.turnComplete) {
+          const beginListening = () => {
+            if (!mountedRef.current || streamRef.current) return;
+            startMicrophone().catch((micError: any) => {
+              setError(micError?.message || 'Microphone permission is required for voice mode.');
+              setStatus('ready');
+            });
+          };
           window.setTimeout(() => {
-            if (mountedRef.current && playbackSourcesRef.current.length === 0) setStatus('listening');
-          }, 100);
+            if (playbackSourcesRef.current.length === 0) beginListening();
+            else {
+              const waitForPlayback = window.setInterval(() => {
+                if (!mountedRef.current) { window.clearInterval(waitForPlayback); return; }
+                if (playbackSourcesRef.current.length === 0) {
+                  window.clearInterval(waitForPlayback);
+                  beginListening();
+                }
+              }, 60);
+              window.setTimeout(() => window.clearInterval(waitForPlayback), 10000);
+            }
+          }, 80);
         }
       };
 
