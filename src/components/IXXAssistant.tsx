@@ -177,14 +177,14 @@ export const IXXAssistant: React.FC<IXXAssistantProps> = ({ onOpenFullChat }) =>
     setStatus('connecting');
 
     try {
-      const tokenResponse = await fetch('/api/gemini-live-token', { method: 'POST' });
+      const tokenResponse = await fetch('/api/gemini-live-token-v2', { method: 'POST' });
       const tokenData = await tokenResponse.json();
       if (!tokenResponse.ok || !tokenData.token) throw new Error(tokenData.error || 'Gemini Live token unavailable');
 
       const outputContext = new AudioContext({ sampleRate: 24000 });
       outputContextRef.current = outputContext;
 
-      const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent?access_token=${encodeURIComponent(tokenData.token)}`);
+      const ws = new WebSocket(`wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContentConstrained?access_token=${encodeURIComponent(tokenData.token)}`);
       wsRef.current = ws;
 
       ws.onopen = async () => {
